@@ -26,3 +26,13 @@ provider "azurerm" {
     }
   }
 }
+
+resource "azurerm_resource_group" "main" {
+  name     = "rg-support-agent-dev"
+  location = "eastus"
+
+  tags = {
+    project     = "support-agent"
+    environment = "dev"
+  }
+}
