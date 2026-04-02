@@ -1,0 +1,26 @@
+name: Upload Invoices to Azure Blob
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'invoices/**'   # only triggers when invoices change
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install AzCopy
+        run: |
+          wget -q https://aka.ms/downloadazcopy-v10-linux -O azcopy.tar.gz
+          tar -xf azcopy.tar.gz --strip-components=1
+          sudo mv azcopy /usr/local/bin/
+
+      - name: Upload to Azure Blob
+        run: |
+          azcopy copy './invoices/*' \
+            "https://${{ secrets.AZURE_STORAGE_ACCOUNT }}.blob.core.windows.net/${{ secrets.AZURE_CONTAINER }}?${{ secrets.AZURE_SAS_TOKEN }}" \
+            --recursive \
+            --overwrite=ifSourceNewer
