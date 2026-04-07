@@ -17,6 +17,13 @@ resource "azurerm_search_service" "main" {
   }
 }
 
+# Allow SP to create/manage indexes on the search service
+resource "azurerm_role_assignment" "sp_search_index_contributor" {
+  scope                = azurerm_search_service.main.id
+  role_definition_name = "Search Index Data Contributor"
+  principal_id         = data.azurerm_client_config.current.object_id
+}
+
 # Allow AI Search to read from blob storage
 resource "azurerm_role_assignment" "search_blob_reader" {
   scope                = azurerm_storage_account.documents.id
