@@ -27,3 +27,8 @@ resource "azurerm_role_assignment" "sp_blob_contributor" {
   role_definition_name = "Storage Blob Data Contributor"
   principal_id         = data.azurerm_client_config.current.object_id
 }
+
+output "sp_object_id" {
+  value       = data.azurerm_client_config.current.object_id
+  description = "Object ID used for the Storage Blob Data Contributor role assignment"
+}
