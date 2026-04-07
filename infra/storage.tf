@@ -2,7 +2,7 @@
 # Storage account and blob container for RAG document ingestion
 
 resource "azurerm_storage_account" "documents" {
-  name                     = "stragdocsdev"
+  name                     = "stinvdocsdev"
   resource_group_name      = azurerm_resource_group.main.name
   location                 = azurerm_resource_group.main.location
   account_tier             = "Standard"

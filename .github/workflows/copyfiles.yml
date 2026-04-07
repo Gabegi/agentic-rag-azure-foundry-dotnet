@@ -25,7 +25,7 @@ jobs:
       - name: Upload to Azure Blob
         run: |
           azcopy copy './invoices/*' \
-            "https://stragdocsdev.blob.core.windows.net/documents" \
+            "https://stinvdocsdev.blob.core.windows.net/documents" \
             --recursive \
             --overwrite=ifSourceNewer
         env:
