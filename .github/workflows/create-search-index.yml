@@ -17,7 +17,7 @@ jobs:
         run: |
           az rest \
             --method PUT \
-            --url "https://srch-rag-invoices-dev.search.windows.net/indexes/invoices?api-version=2025-05-01" \
+            --url "https://srch-rag-invoices-dev.search.windows.net/indexes/invoices?api-version=2024-07-01" \
             --resource "https://search.azure.com/" \
             --headers "Content-Type=application/json" \
             --body '{
