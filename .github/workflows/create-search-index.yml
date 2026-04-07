@@ -35,7 +35,7 @@ jobs:
               ],
               "vectorSearch": {
                 "profiles":              [{ "name": "vector-profile", "algorithm": "hnsw-config" }],
-                "algorithmConfigurations": [{ "name": "hnsw-config", "kind": "hnsw" }]
+                "algorithms": [{ "name": "hnsw-config", "kind": "hnsw" }]
               },
               "semantic": {
                 "configurations": [{
