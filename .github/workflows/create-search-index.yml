@@ -41,8 +41,8 @@ jobs:
                 "configurations": [{
                   "name": "semantic-config",
                   "prioritizedFields": {
-                    "contentFields":  [{ "fieldName": "content" }],
-                    "keywordsFields": [{ "fieldName": "vendor" }, { "fieldName": "category" }]
+                    "prioritizedContentFields":  [{ "fieldName": "content" }],
+                    "prioritizedKeywordsFields": [{ "fieldName": "vendor" }, { "fieldName": "category" }]
                   }
                 }]
               }
