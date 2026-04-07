@@ -9,6 +9,10 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "~> 4.0"
     }
+    azapi = {
+      source  = "azure/azapi"
+      version = "~> 2.0"
+    }
   }
 
   backend "azurerm" {
@@ -18,6 +22,8 @@ terraform {
     use_azuread_auth     = true
   }
 }
+
+provider "azapi" {}
 
 provider "azurerm" {
   features {
