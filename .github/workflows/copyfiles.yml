@@ -1,4 +1,4 @@
-name: Upload Documents to Azure Blob
+name: Upload Invoices to Azure Blob
 
 on:
   push:
