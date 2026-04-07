@@ -13,24 +13,11 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Show authenticated identity
-        run: az account show --query '{name:user.name, type:user.type, objectId:id}' -o json
-
-      - name: Install AzCopy
-        run: |
-          wget -q https://aka.ms/downloadazcopy-v10-linux -O azcopy.tar.gz
-          tar -xf azcopy.tar.gz --strip-components=1
-          sudo mv azcopy /usr/local/bin/
-
       - name: Upload to Azure Blob
         run: |
-          azcopy copy './invoices/*' \
-            "https://stinvdocsdev.blob.core.windows.net/documents" \
-            --recursive \
-            --overwrite=ifSourceNewer
-        env:
-          AZCOPY_AUTO_LOGIN_TYPE: AZCLI
-
-      - name: Debug AzCopy log
-        if: failure()
-        run: cat /home/runner/.azcopy/*.log
+          az storage blob upload-batch \
+            --account-name stinvdocsdev \
+            --destination documents \
+            --source ./invoices \
+            --overwrite true \
+            --auth-mode login
