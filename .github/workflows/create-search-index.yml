@@ -34,8 +34,8 @@ jobs:
                 { "name": "content_vector","type": "Collection(Edm.Single)", "searchable": true, "dimensions": 1536, "vectorSearchProfile": "vector-profile" }
               ],
               "vectorSearch": {
-                "profiles":   [{ "name": "vector-profile", "algorithmConfigurationName": "hnsw-config" }],
-                "algorithms": [{ "name": "hnsw-config", "kind": "hnsw" }]
+                "profiles":              [{ "name": "vector-profile", "algorithm": "hnsw-config" }],
+                "algorithmConfigurations": [{ "name": "hnsw-config", "kind": "hnsw" }]
               },
               "semantic": {
                 "configurations": [{
