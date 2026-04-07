@@ -20,4 +20,4 @@ jobs:
             --destination documents \
             --source ./invoices \
             --overwrite true \
-            --auth-mode login
+            --auth-mode key
