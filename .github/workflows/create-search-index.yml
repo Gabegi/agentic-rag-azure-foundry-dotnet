@@ -1,0 +1,48 @@
+name: Create Search Index
+
+on:
+  workflow_dispatch:
+
+jobs:
+  create-index:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Create invoices index
+        run: |
+          az rest \
+            --method PUT \
+            --url "https://srch-rag-invoices-dev.search.windows.net/indexes/invoices?api-version=2025-05-01" \
+            --headers "Content-Type=application/json" \
+            --body '{
+              "name": "invoices",
+              "fields": [
+                { "name": "id",            "type": "Edm.String",         "key": true,  "searchable": false },
+                { "name": "vendor",        "type": "Edm.String",         "searchable": true, "filterable": true, "facetable": true },
+                { "name": "amount",        "type": "Edm.Double",         "searchable": false, "filterable": true, "sortable": true },
+                { "name": "discount",      "type": "Edm.Double",         "searchable": false, "filterable": true },
+                { "name": "category",      "type": "Edm.String",         "searchable": true, "filterable": true, "facetable": true },
+                { "name": "date",          "type": "Edm.DateTimeOffset", "filterable": true, "sortable": true },
+                { "name": "payment_terms", "type": "Edm.String",         "searchable": true, "filterable": true },
+                { "name": "content",       "type": "Edm.String",         "searchable": true },
+                { "name": "content_vector","type": "Collection(Edm.Single)", "searchable": true, "dimensions": 1536, "vectorSearchProfile": "vector-profile" }
+              ],
+              "vectorSearch": {
+                "profiles":   [{ "name": "vector-profile", "algorithmConfigurationName": "hnsw-config" }],
+                "algorithms": [{ "name": "hnsw-config", "kind": "hnsw" }]
+              },
+              "semantic": {
+                "configurations": [{
+                  "name": "semantic-config",
+                  "prioritizedFields": {
+                    "contentFields":  [{ "fieldName": "content" }],
+                    "keywordsFields": [{ "fieldName": "vendor" }, { "fieldName": "category" }]
+                  }
+                }]
+              }
+            }'
