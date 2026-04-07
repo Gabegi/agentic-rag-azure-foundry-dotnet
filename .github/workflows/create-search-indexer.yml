@@ -1,0 +1,49 @@
+name: Create Search Indexer
+
+on:
+  workflow_dispatch:
+
+jobs:
+  create-indexer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Create data source
+        run: |
+          az rest --method PUT \
+            --url "https://srch-rag-invoices-dev.search.windows.net/datasources/invoices-blob?api-version=2024-07-01" \
+            --resource "https://search.azure.com/" \
+            --headers "Content-Type=application/json" \
+            --body '{
+              "name": "invoices-blob",
+              "type": "azureblob",
+              "credentials": {
+                "connectionString": "ResourceId=/subscriptions/7c8a8cb5-ee45-4e6e-9a20-4534c4796d8b/resourceGroups/rg-support-agent-dev/providers/Microsoft.Storage/storageAccounts/stinvdocsdev;"
+              },
+              "container": {
+                "name": "documents"
+              }
+            }'
+
+      - name: Create indexer
+        run: |
+          az rest --method PUT \
+            --url "https://srch-rag-invoices-dev.search.windows.net/indexers/invoices-indexer?api-version=2024-07-01" \
+            --resource "https://search.azure.com/" \
+            --headers "Content-Type=application/json" \
+            --body '{
+              "name": "invoices-indexer",
+              "dataSourceName": "invoices-blob",
+              "targetIndexName": "invoices",
+              "schedule": { "interval": "PT1H" },
+              "parameters": {
+                "batchSize": 100,
+                "configuration": {
+                  "dataToExtract": "contentAndMetadata",
+                  "parsingMode": "default"
+                }
+              }
+            }'
