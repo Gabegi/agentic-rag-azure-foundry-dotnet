@@ -1,10 +1,7 @@
 name: Upload Invoices to Azure Blob
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'invoices/**'
+  workflow_dispatch:
 
 jobs:
   upload:
