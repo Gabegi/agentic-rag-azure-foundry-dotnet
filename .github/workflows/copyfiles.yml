@@ -27,3 +27,7 @@ jobs:
             --overwrite=ifSourceNewer
         env:
           AZCOPY_AUTO_LOGIN_TYPE: AZCLI
+
+      - name: Debug AzCopy log
+        if: failure()
+        run: cat /home/runner/.azcopy/*.log
