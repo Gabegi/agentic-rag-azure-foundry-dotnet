@@ -1,5 +1,5 @@
 resource "azapi_resource" "invoice_index" {
-  type                    = "Microsoft.Search/searchServices/indexes@2024-07-01"
+  type                    = "Microsoft.Search/searchServices/indexes@2025-05-01"
   name                    = "invoices"
   parent_id               = azurerm_search_service.main.id
   schema_validation_enabled = false
