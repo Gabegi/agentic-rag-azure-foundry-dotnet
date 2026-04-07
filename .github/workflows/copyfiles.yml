@@ -1,16 +1,20 @@
-name: Upload Invoices to Azure Blob
+name: Upload Documents to Azure Blob
 
 on:
   push:
     branches: [main]
     paths:
-      - 'invoices/**'   # only triggers when invoices change
+      - 'documents/**'
 
 jobs:
   upload:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Install AzCopy
         run: |
@@ -20,7 +24,9 @@ jobs:
 
       - name: Upload to Azure Blob
         run: |
-          azcopy copy './invoices/*' \
-            "https://${{ secrets.AZURE_STORAGE_ACCOUNT }}.blob.core.windows.net/${{ secrets.AZURE_CONTAINER }}?${{ secrets.AZURE_SAS_TOKEN }}" \
+          azcopy copy './documents/*' \
+            "https://stragdocsdev.blob.core.windows.net/documents" \
             --recursive \
             --overwrite=ifSourceNewer
+        env:
+          AZCOPY_AUTO_LOGIN_TYPE: AZCLI
