@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'documents/**'
+      - 'invoices/**'
 
 jobs:
   upload:
@@ -24,7 +24,7 @@ jobs:
 
       - name: Upload to Azure Blob
         run: |
-          azcopy copy './documents/*' \
+          azcopy copy './invoices/*' \
             "https://stragdocsdev.blob.core.windows.net/documents" \
             --recursive \
             --overwrite=ifSourceNewer
