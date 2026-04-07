@@ -13,6 +13,9 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Show authenticated identity
+        run: az account show --query '{name:user.name, type:user.type, objectId:id}' -o json
+
       - name: Install AzCopy
         run: |
           wget -q https://aka.ms/downloadazcopy-v10-linux -O azcopy.tar.gz
