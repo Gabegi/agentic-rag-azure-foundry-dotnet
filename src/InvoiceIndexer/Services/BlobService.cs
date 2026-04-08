@@ -1,4 +1,5 @@
 using Azure.Storage.Blobs;
+using InvoiceIndexer.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace InvoiceIndexer.Services;
