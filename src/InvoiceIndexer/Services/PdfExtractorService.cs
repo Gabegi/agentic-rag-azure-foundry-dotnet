@@ -1,6 +1,5 @@
 using Azure;
 using Azure.AI.FormRecognizer.DocumentAnalysis;
-using InvoiceIndexer.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace InvoiceIndexer.Services;

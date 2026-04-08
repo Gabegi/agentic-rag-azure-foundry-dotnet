@@ -1,5 +1,4 @@
 using Azure.AI.OpenAI;
-using ClientModel = System.ClientModel;
 using InvoiceIndexer.Configuration;
 using Microsoft.Extensions.Logging;
 using OpenAI.Embeddings;
