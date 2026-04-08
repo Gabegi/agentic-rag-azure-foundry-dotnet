@@ -10,4 +10,5 @@ public class IndexerConfig
     public string SearchIndexName { get; init; } = default!;
     public string KnowledgeSourceName { get; init; } = default!;
     public string KnowledgeBaseName { get; init; } = default!;
+    public string OpenAiGptDeployment { get; init; } = default!;
 }
