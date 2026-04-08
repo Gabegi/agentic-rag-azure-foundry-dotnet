@@ -11,4 +11,5 @@ public class IndexerConfig
     public string KnowledgeSourceName { get; init; } = default!;
     public string KnowledgeBaseName { get; init; } = default!;
     public string OpenAiGptDeployment { get; init; } = default!;
+    public string DocumentIntelligenceEndpoint { get; init; } = default!;
 }
