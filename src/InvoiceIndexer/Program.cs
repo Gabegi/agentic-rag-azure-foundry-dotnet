@@ -1,4 +1,5 @@
 using Azure.AI.FormRecognizer.DocumentAnalysis;
+using Azure.AI.OpenAI;
 using Azure.Identity;
 using Azure.Storage.Blobs;
 using InvoiceIndexer.Configuration;
@@ -43,9 +44,13 @@ var host = Host.CreateDefaultBuilder(args)
             new DocumentAnalysisClient(
                 new Uri(config.DocumentIntelligenceEndpoint), credential));
 
+        services.AddSingleton(_ =>
+            new AzureOpenAIClient(new Uri(config.OpenAiEndpoint), credential));
+
         // Services
         services.AddSingleton<IBlobService, BlobService>();
         services.AddSingleton<IPdfExtractor, PdfExtractorService>();
+        services.AddSingleton<IEmbeddingService, EmbeddingService>();
     })
     .Build();
 
