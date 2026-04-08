@@ -15,9 +15,12 @@ jobs:
 
       - name: Upload to Azure Blob
         run: |
-          az storage blob upload-batch \
-            --account-name stinvdocsdev \
-            --destination documents \
-            --source ./invoices \
-            --overwrite true \
-            --auth-mode key
+          find ./invoices -name "*.pdf" | head -500 | while read file; do
+            az storage blob upload \
+              --account-name stinvdocsdev \
+              --container-name documents \
+              --file "$file" \
+              --name "${file#./invoices/}" \
+              --overwrite true \
+              --auth-mode key
+          done
