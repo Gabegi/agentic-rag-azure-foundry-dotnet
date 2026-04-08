@@ -2,5 +2,5 @@ namespace InvoiceIndexer.Services;
 
 public interface IEmbeddingService
 {
-    Task<IReadOnlyList<float>> GenerateEmbeddingAsync(string text, CancellationToken ct = default);
+    Task<ReadOnlyMemory<float>> GenerateEmbeddingAsync(string text, CancellationToken ct = default);
 }

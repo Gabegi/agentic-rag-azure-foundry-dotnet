@@ -1,4 +1,5 @@
 using Azure.AI.OpenAI;
+using ClientModel = System.ClientModel;
 using InvoiceIndexer.Configuration;
 using Microsoft.Extensions.Logging;
 using OpenAI.Embeddings;
@@ -16,12 +17,11 @@ public class EmbeddingService : IEmbeddingService
         _logger = logger;
     }
 
-    public async Task<IReadOnlyList<float>> GenerateEmbeddingAsync(string text, CancellationToken ct = default)
+    public async Task<ReadOnlyMemory<float>> GenerateEmbeddingAsync(string text, CancellationToken ct = default)
     {
         _logger.LogInformation("Generating embedding ({Chars} chars)", text.Length);
 
         var result = await _client.GenerateEmbeddingAsync(text, cancellationToken: ct);
-
         return result.Value.ToFloats();
     }
 }

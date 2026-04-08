@@ -14,5 +14,5 @@ public class InvoiceChunk
     public string PageChunk { get; set; } = default!;
 
     [JsonPropertyName("page_embedding_text_3_large")]
-    public IReadOnlyList<float> PageEmbeddingText3Large { get; set; } = default!;
+    public ReadOnlyMemory<float> PageEmbeddingText3Large { get; set; }
 }
