@@ -37,3 +37,4 @@ override.tf.json
 terraform.rc
 *.cache
 /src/InvoiceIndexer/obj
+/src/InvoiceIndexer/bin
