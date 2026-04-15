@@ -38,3 +38,5 @@ terraform.rc
 *.cache
 /src/InvoiceIndexer/obj
 /src/InvoiceIndexer/bin
+/.vs
+/.claude

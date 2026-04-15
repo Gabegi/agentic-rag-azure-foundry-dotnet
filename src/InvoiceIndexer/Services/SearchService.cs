@@ -52,16 +52,16 @@ public class SearchService : ISearchService
             SemanticSearch = semanticSearch,
             Fields =
             {
-                new SimpleField("id", SearchFieldDataType.String)           { IsKey = true, IsFilterable = true, IsRetrievable = true },
-                new SearchableField("vendor")                               { IsFilterable = true, IsFacetable = true, IsRetrievable = true },
-                new SimpleField("amount",   SearchFieldDataType.Double)     { IsFilterable = true, IsSortable = true, IsRetrievable = true },
-                new SimpleField("discount", SearchFieldDataType.Double)     { IsFilterable = true, IsSortable = true, IsRetrievable = true },
-                new SearchableField("category")                             { IsFilterable = true, IsFacetable = true, IsRetrievable = true },
-                new SimpleField("date", SearchFieldDataType.DateTimeOffset) { IsFilterable = true, IsSortable = true, IsRetrievable = true },
-                new SearchableField("payment_terms")                        { IsFilterable = true, IsRetrievable = true },
-                new SimpleField("source_file", SearchFieldDataType.String)  { IsFilterable = true, IsRetrievable = true },
-                new SearchableField("content")                              { IsRetrievable = true, AnalyzerName = "en.microsoft" },
-                new VectorSearchField("content_vector", 1536, "vector-profile") { IsStored = false }
+                new SimpleField("id", SearchFieldDataType.String)           { IsKey = true, IsFilterable = true },
+                new SearchableField("vendor")                               { IsFilterable = true, IsFacetable = true },
+                new SimpleField("amount",   SearchFieldDataType.Double)     { IsFilterable = true, IsSortable = true },
+                new SimpleField("discount", SearchFieldDataType.Double)     { IsFilterable = true, IsSortable = true },
+                new SearchableField("category")                             { IsFilterable = true, IsFacetable = true },
+                new SimpleField("date", SearchFieldDataType.DateTimeOffset) { IsFilterable = true, IsSortable = true },
+                new SearchableField("payment_terms")                        { IsFilterable = true },
+                new SimpleField("source_file", SearchFieldDataType.String)  { IsFilterable = true },
+                new SearchableField("content")                              { AnalyzerName = "en.microsoft" },
+                new VectorSearchField("content_vector", 1536, "vector-profile") { IsHidden = true, IsStored = false }
             }
         };
 
