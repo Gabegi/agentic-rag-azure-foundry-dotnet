@@ -10,13 +10,19 @@ namespace InvoiceIndexer.Services;
 public class DocumentService : IDocumentService
 {
     private readonly BlobContainerClient _containerClient;
+    private readonly IPdfExtractor _pdfExtractor;
     private readonly ILogger<DocumentService> _logger;
 
-    public DocumentService(IndexerConfig config, TokenCredential credential, ILogger<DocumentService> logger)
+    public DocumentService(
+        IndexerConfig config,
+        TokenCredential credential,
+        IPdfExtractor pdfExtractor,
+        ILogger<DocumentService> logger)
     {
         _containerClient = new BlobServiceClient(new Uri(config.StorageAccountUrl), credential)
             .GetBlobContainerClient(config.StorageContainer);
-        _logger = logger;
+        _pdfExtractor = pdfExtractor;
+        _logger       = logger;
     }
 
     public async Task<IEnumerable<BlobItem>> ReadBlobsAsync(CancellationToken ct = default)
@@ -41,8 +47,40 @@ public class DocumentService : IDocumentService
         return blobs;
     }
 
-    public Task<IEnumerable<InvoiceDocument>> ExtractDocumentsAsync(IEnumerable<BlobItem> blobs, CancellationToken ct = default)
-        => throw new NotImplementedException();
+    public async Task<IEnumerable<InvoiceDocument>> ExtractDocumentsAsync(
+        IEnumerable<BlobItem> blobs,
+        CancellationToken ct = default)
+    {
+        _logger.LogInformation("Extracting {Count} documents", blobs.Count());
+
+        var documents = new List<InvoiceDocument>();
+
+        foreach (var blob in blobs)
+        {
+            _logger.LogInformation("Extracting {Name}", blob.Name);
+
+            var blobClient = _containerClient.GetBlobClient(blob.Name);
+            var blobUrl    = blobClient.Uri;
+
+            var extractedText = await _pdfExtractor.ExtractTextAsync(blobUrl, ct);
+
+            if (string.IsNullOrEmpty(extractedText))
+            {
+                _logger.LogWarning("No text extracted from {Name}", blob.Name);
+                continue;
+            }
+
+            documents.Add(new InvoiceDocument
+            {
+                Id         = blob.Name.Replace(".pdf", "").Replace("/", "-"),
+                SourceFile = blob.Name,
+                Content    = extractedText
+            });
+        }
+
+        _logger.LogInformation("Extracted {Count} documents", documents.Count);
+        return documents;
+    }
 
     public Task<IEnumerable<InvoiceDocument>> EmbedDocumentsAsync(IEnumerable<InvoiceDocument> documents, CancellationToken ct = default)
         => throw new NotImplementedException();
