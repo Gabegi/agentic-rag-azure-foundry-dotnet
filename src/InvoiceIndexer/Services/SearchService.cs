@@ -1,8 +1,13 @@
+using Azure;
+using Azure.AI.DocumentIntelligence;
+using Azure.AI.OpenAI;
 using Azure.Core;
 using Azure.Search.Documents;
 using Azure.Search.Documents.Indexes;
 using Azure.Search.Documents.Indexes.Models;
+using Azure.Storage.Blobs;
 using InvoiceIndexer.Configuration;
+using InvoiceIndexer.Models;
 
 namespace InvoiceIndexer.Services;
 
@@ -11,12 +16,14 @@ public class SearchService : ISearchService
     private readonly SearchIndexClient _indexClient;
     private readonly SearchClient _searchClient;
     private readonly IndexerConfig _config;
+    private readonly TokenCredential _credential;
     private const string IndexName = "invoices";
 
     public SearchService(IndexerConfig config, TokenCredential credential)
     {
-        _config      = config;
-        _indexClient = new SearchIndexClient(new Uri(config.SearchEndpoint), credential);
+        _config       = config;
+        _credential   = credential;
+        _indexClient  = new SearchIndexClient(new Uri(config.SearchEndpoint), credential);
         _searchClient = new SearchClient(new Uri(config.SearchEndpoint), IndexName, credential);
     }
 
