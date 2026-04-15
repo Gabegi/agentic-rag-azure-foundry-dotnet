@@ -1,5 +1,6 @@
 using Azure.AI.DocumentIntelligence;
 using Azure.AI.OpenAI;
+using Azure.Core;
 using Azure.Identity;
 using Azure.Storage.Blobs;
 using InvoiceIndexer.Configuration;
@@ -31,7 +32,7 @@ var host = Host.CreateDefaultBuilder(args)
             DocumentIntelligenceEndpoint = ctx.Configuration["DOCUMENT_INTELLIGENCE_ENDPOINT"]!,
         };
 
-        var credential = new DefaultAzureCredential();
+        TokenCredential credential = new DefaultAzureCredential();
 
         services.AddSingleton(config);
         services.AddSingleton(credential);
@@ -48,7 +49,14 @@ var host = Host.CreateDefaultBuilder(args)
             new AzureOpenAIClient(new Uri(config.OpenAiEndpoint), credential));
 
         // Services
+        services.AddSingleton<IIndexService, IndexService>();
+        services.AddSingleton<IDocumentService, DocumentService>();
+        services.AddSingleton<IEmbeddingService, EmbeddingService>();
+        services.AddSingleton<IKnowledgeService, KnowledgeService>();
+        services.AddSingleton<IPipelineOrchestrator, PipelineOrchestrator>();
     })
     .Build();
 
-await host.RunAsync();
+// run the pipeline
+var orchestrator = host.Services.GetRequiredService<IPipelineOrchestrator>();
+await orchestrator.RunAsync();
