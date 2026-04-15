@@ -66,7 +66,7 @@ public class DocumentService : IDocumentService
             var operation = await _diClient.AnalyzeDocumentAsync(
                 WaitUntil.Completed,
                 "prebuilt-invoice",
-                new AnalyzeDocumentContent { UrlSource = blobClient.Uri },
+                blobClient.Uri,
                 cancellationToken: ct);
 
             var invoice = operation.Value.Documents?.FirstOrDefault();
@@ -78,8 +78,8 @@ public class DocumentService : IDocumentService
             }
 
             var vendor       = invoice.Fields.TryGetValue("VendorName",    out var v)  ? v.Content     : null;
-            var amount       = invoice.Fields.TryGetValue("InvoiceTotal",  out var a)  ? a.ValueNumber : null;
-            var discount     = invoice.Fields.TryGetValue("TotalDiscount", out var d)  ? d.ValueNumber : null;
+            var amount       = invoice.Fields.TryGetValue("InvoiceTotal",  out var a)  ? a.ValueDouble : null;
+            var discount     = invoice.Fields.TryGetValue("TotalDiscount", out var d)  ? d.ValueDouble : null;
             var category     = invoice.Fields.TryGetValue("PurchaseOrder", out var c)  ? c.Content     : null;
             var date         = invoice.Fields.TryGetValue("InvoiceDate",   out var dt) ? dt.ValueDate  : null;
             var paymentTerms = invoice.Fields.TryGetValue("PaymentTerm",   out var p)  ? p.Content     : null;
