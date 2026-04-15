@@ -5,13 +5,13 @@ using InvoiceIndexer.Configuration;
 
 namespace InvoiceIndexer.Services;
 
-public class SearchService : ISearchService
+public class IndexService : IIndexService
 {
     private readonly SearchIndexClient _indexClient;
     private readonly IndexerConfig _config;
     private const string IndexName = "invoices";
 
-    public SearchService(IndexerConfig config, TokenCredential credential)
+    public IndexService(IndexerConfig config, TokenCredential credential)
     {
         _config      = config;
         _indexClient = new SearchIndexClient(new Uri(config.SearchEndpoint), credential);

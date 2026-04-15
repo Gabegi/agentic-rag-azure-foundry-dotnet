@@ -108,9 +108,4 @@ public class DocumentService : IDocumentService
         return documents;
     }
 
-    public Task<IEnumerable<InvoiceDocument>> EmbedDocumentsAsync(IEnumerable<InvoiceDocument> documents, CancellationToken ct = default)
-        => throw new NotImplementedException();
-
-    public Task UploadDocumentsAsync(IEnumerable<InvoiceDocument> documents, CancellationToken ct = default)
-        => throw new NotImplementedException();
 }

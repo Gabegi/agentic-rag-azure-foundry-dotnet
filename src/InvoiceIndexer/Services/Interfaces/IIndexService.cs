@@ -1,4 +1,4 @@
-public interface ISearchService
+public interface IIndexService
 {
     Task EnsureIndexAsync();
 }
