@@ -78,9 +78,69 @@ public class SearchService : ISearchService
         await _indexClient.CreateOrUpdateIndexAsync(index);
     }
 
-    public async Task EmbedDocumentsAsync()
+    public async Task<IEnumerable<InvoiceDocument>> EmbedDocumentsAsync()
     {
-        throw new NotImplementedException();
+        var containerClient = new BlobContainerClient(
+            new Uri(_config.StorageAccountUrl),
+            _config.StorageContainer,
+            _credential);
+
+        var diClient = new DocumentIntelligenceClient(
+            new Uri(_config.DocumentIntelligenceEndpoint), _credential);
+
+        var embeddingClient = new AzureOpenAIClient(
+            new Uri(_config.OpenAiEndpoint), _credential)
+            .GetEmbeddingClient("text-embedding-3-large");
+
+        var documents = new List<InvoiceDocument>();
+
+        await foreach (var blob in containerClient.GetBlobsAsync())
+        {
+            var blobClient = containerClient.GetBlobClient(blob.Name);
+            var download   = await blobClient.DownloadContentAsync();
+
+            var operation = await diClient.AnalyzeDocumentAsync(
+                WaitUntil.Completed,
+                "prebuilt-invoice",
+                new AnalyzeDocumentContent
+                {
+                    Base64Source = BinaryData.FromBytes(download.Value.Content.ToArray())
+                }
+            );
+
+            var invoice = operation.Value.Documents?.FirstOrDefault();
+            if (invoice == null) continue;
+
+            var vendor       = invoice.Fields.TryGetValue("VendorName",    out var v)  ? v.Content     : null;
+            var amount       = invoice.Fields.TryGetValue("InvoiceTotal",  out var a)  ? a.ValueNumber : null;
+            var discount     = invoice.Fields.TryGetValue("TotalDiscount", out var d)  ? d.ValueNumber : null;
+            var category     = invoice.Fields.TryGetValue("PurchaseOrder", out var c)  ? c.Content     : null;
+            var date         = invoice.Fields.TryGetValue("InvoiceDate",   out var dt) ? dt.ValueDate  : null;
+            var paymentTerms = invoice.Fields.TryGetValue("PaymentTerm",   out var p)  ? p.Content     : null;
+
+            var content = $"Invoice from {vendor} dated {date:yyyy-MM-dd}. " +
+                          $"Category: {category}. Amount: ${amount}. "       +
+                          $"Discount: {discount}%. Payment terms: {paymentTerms}.";
+
+            var embeddingResult = await embeddingClient.GenerateEmbeddingAsync(content);
+            var vector          = embeddingResult.Value.Vector.ToArray();
+
+            documents.Add(new InvoiceDocument
+            {
+                Id            = blob.Name.Replace(".pdf", "").Replace("/", "-"),
+                Vendor        = vendor,
+                Amount        = amount,
+                Discount      = discount,
+                Category      = category,
+                Date          = date,
+                PaymentTerms  = paymentTerms,
+                SourceFile    = blob.Name,
+                Content       = content,
+                ContentVector = vector
+            });
+        }
+
+        return documents;
     }
 
     public async Task UploadChunksAsync()
