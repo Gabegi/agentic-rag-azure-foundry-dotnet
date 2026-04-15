@@ -58,12 +58,12 @@ public class KnowledgeService : IKnowledgeService
         {
             ResourceUri    = new Uri(_config.OpenAiEndpoint),
             DeploymentName = _config.OpenAiGptDeployment,
-            ModelName      = _config.OpenAiGptDeployment
+            ModelName      = _config.OpenAiGptModelName
         };
 
         var knowledgeBase = new KnowledgeBase(
-            name: KnowledgeBaseName,
-            knowledgeSources: new[] { new KnowledgeSourceReference(KnowledgeSourceName) }
+            name: _config.KnowledgeBaseName,
+            knowledgeSources: new[] { new KnowledgeSourceReference(_config.KnowledgeSourceName) }
         )
         {
             Description              = "Knowledge base for invoice retrieval",
