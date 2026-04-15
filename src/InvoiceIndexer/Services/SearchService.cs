@@ -22,50 +22,49 @@ public class SearchService : ISearchService
 
     public async Task EnsureIndexAsync()
     {
+        var vectorSearch = new VectorSearch();
+        vectorSearch.Algorithms.Add(new HnswAlgorithmConfiguration("hnsw-config"));
+        vectorSearch.Profiles.Add(new VectorSearchProfile("vector-profile", "hnsw-config")
+        {
+            VectorizerName = "openai-vectorizer"
+        });
+        vectorSearch.Vectorizers.Add(new AzureOpenAIVectorizer("openai-vectorizer")
+        {
+            Parameters = new AzureOpenAIVectorizerParameters
+            {
+                ResourceUri    = new Uri(_config.OpenAiEndpoint),
+                DeploymentName = "text-embedding-3-large",
+                ModelName      = "text-embedding-3-large"
+            }
+        });
+
+        var semanticConfig = new SemanticConfiguration("semantic-config", new SemanticPrioritizedFields
+        {
+            ContentFields  = { new SemanticField("content") },
+            KeywordsFields = { new SemanticField("vendor"), new SemanticField("category") }
+        });
+
+        var semanticSearch = new SemanticSearch();
+        semanticSearch.Configurations.Add(semanticConfig);
+        semanticSearch.DefaultConfigurationName = "semantic-config";
+
         var index = new SearchIndex(IndexName)
         {
-            Description = "Invoice index containing vendor, amount, discount, category, date and payment terms from PDF invoices.",
+            Description    = "Invoice index containing vendor, amount, discount, category, date and payment terms from PDF invoices.",
+            VectorSearch   = vectorSearch,
+            SemanticSearch = semanticSearch,
             Fields =
             {
-                new SimpleField("id", SearchFieldDataType.String) { IsKey = true, IsFilterable = true, IsRetrievable = true },
-                new SearchableField("vendor") { IsFilterable = true, IsFacetable = true, IsRetrievable = true },
-                new SimpleField("amount", SearchFieldDataType.Double) { IsFilterable = true, IsSortable = true, IsRetrievable = true },
-                new SimpleField("discount", SearchFieldDataType.Double) { IsFilterable = true, IsSortable = true, IsRetrievable = true },
-                new SearchableField("category") { IsFilterable = true, IsFacetable = true, IsRetrievable = true },
+                new SimpleField("id", SearchFieldDataType.String)           { IsKey = true, IsFilterable = true, IsRetrievable = true },
+                new SearchableField("vendor")                               { IsFilterable = true, IsFacetable = true, IsRetrievable = true },
+                new SimpleField("amount",   SearchFieldDataType.Double)     { IsFilterable = true, IsSortable = true, IsRetrievable = true },
+                new SimpleField("discount", SearchFieldDataType.Double)     { IsFilterable = true, IsSortable = true, IsRetrievable = true },
+                new SearchableField("category")                             { IsFilterable = true, IsFacetable = true, IsRetrievable = true },
                 new SimpleField("date", SearchFieldDataType.DateTimeOffset) { IsFilterable = true, IsSortable = true, IsRetrievable = true },
-                new SearchableField("payment_terms") { IsFilterable = true, IsRetrievable = true },
-                new SimpleField("source_file", SearchFieldDataType.String) { IsFilterable = true, IsRetrievable = true },
-                new SearchableField("content") { IsRetrievable = true, AnalyzerName = "en.microsoft" },
+                new SearchableField("payment_terms")                        { IsFilterable = true, IsRetrievable = true },
+                new SimpleField("source_file", SearchFieldDataType.String)  { IsFilterable = true, IsRetrievable = true },
+                new SearchableField("content")                              { IsRetrievable = true, AnalyzerName = "en.microsoft" },
                 new VectorSearchField("content_vector", 1536, "vector-profile") { IsStored = false }
-            },
-            VectorSearch = new VectorSearch
-            {
-                Profiles   = { new VectorSearchProfile("vector-profile", "hnsw-config") { VectorizerName = "openai-vectorizer" } },
-                Algorithms = { new HnswAlgorithmConfiguration("hnsw-config") },
-                Vectorizers =
-                {
-                    new AzureOpenAIVectorizer("openai-vectorizer")
-                    {
-                        Parameters = new AzureOpenAIVectorizerParameters
-                        {
-                            ResourceUri    = new Uri(_config.OpenAiEndpoint),
-                            DeploymentName = "text-embedding-ada-002",
-                            ModelName      = "text-embedding-ada-002"
-                        }
-                    }
-                }
-            },
-            SemanticSearch = new SemanticSearch
-            {
-                DefaultConfigurationName = "semantic-config",
-                Configurations =
-                {
-                    new SemanticConfiguration("semantic-config", new SemanticPrioritizedFields
-                    {
-                        ContentFields  = { new SemanticField("content") },
-                        KeywordsFields = { new SemanticField("vendor"), new SemanticField("category") }
-                    })
-                }
             }
         };
 
