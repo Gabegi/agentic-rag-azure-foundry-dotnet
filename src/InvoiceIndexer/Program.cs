@@ -1,4 +1,4 @@
-using Azure.AI.FormRecognizer.DocumentAnalysis;
+using Azure.AI.DocumentIntelligence;
 using Azure.AI.OpenAI;
 using Azure.Identity;
 using Azure.Storage.Blobs;
@@ -41,16 +41,13 @@ var host = Host.CreateDefaultBuilder(args)
             new BlobServiceClient(new Uri(config.StorageAccountUrl), credential));
 
         services.AddSingleton(_ =>
-            new DocumentAnalysisClient(
+            new DocumentIntelligenceClient(
                 new Uri(config.DocumentIntelligenceEndpoint), credential));
 
         services.AddSingleton(_ =>
             new AzureOpenAIClient(new Uri(config.OpenAiEndpoint), credential));
 
         // Services
-        services.AddSingleton<IBlobService, BlobService>();
-        services.AddSingleton<IPdfExtractor, PdfExtractorService>();
-        services.AddSingleton<IEmbeddingService, EmbeddingService>();
     })
     .Build();
 
