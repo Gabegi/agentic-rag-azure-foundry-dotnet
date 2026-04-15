@@ -1,6 +1,8 @@
+using InvoiceIndexer.Models;
+
 public interface ISearchService
 {
     Task EnsureIndexAsync();
-    Task EmbedDocumentsAsync();
-    Task UploadChunksAsync();
+    Task<IEnumerable<InvoiceDocument>> EmbedDocumentsAsync();
+    Task UploadChunksAsync(IEnumerable<InvoiceDocument> documents);
 }
