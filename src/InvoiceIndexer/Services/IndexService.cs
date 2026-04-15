@@ -9,8 +9,6 @@ public class IndexService : IIndexService
 {
     private readonly SearchIndexClient _indexClient;
     private readonly IndexerConfig _config;
-    private const string IndexName = "invoices";
-
     public IndexService(IndexerConfig config, TokenCredential credential)
     {
         _config      = config;
@@ -45,7 +43,7 @@ public class IndexService : IIndexService
         semanticSearch.Configurations.Add(semanticConfig);
         semanticSearch.DefaultConfigurationName = "semantic-config";
 
-        var index = new SearchIndex(IndexName)
+        var index = new SearchIndex(_config.SearchIndexName)
         {
             Description    = "Invoice index containing vendor, amount, discount, category, date and payment terms from PDF invoices.",
             VectorSearch   = vectorSearch,
@@ -61,7 +59,7 @@ public class IndexService : IIndexService
                 new SearchableField("payment_terms")                        { IsFilterable = true },
                 new SimpleField("source_file", SearchFieldDataType.String)  { IsFilterable = true },
                 new SearchableField("content")                              { AnalyzerName = "en.microsoft" },
-                new VectorSearchField("content_vector", 1536, "vector-profile") { IsHidden = true, IsStored = false }
+                new VectorSearchField("content_vector", 3072, "vector-profile") { IsHidden = true, IsStored = false }
             }
         };
 

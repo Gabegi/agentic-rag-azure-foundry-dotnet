@@ -14,9 +14,6 @@ public class KnowledgeService : IKnowledgeService
     private readonly IndexerConfig _config;
     private readonly ILogger<KnowledgeService> _logger;
 
-    private const string IndexName           = "invoices";
-    private const string KnowledgeSourceName = "invoices-knowledge-source";
-    private const string KnowledgeBaseName   = "invoices-knowledge-base";
 
     public KnowledgeService(
         IndexerConfig config,

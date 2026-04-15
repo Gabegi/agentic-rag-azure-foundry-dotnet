@@ -13,19 +13,17 @@ public class EmbeddingService : IEmbeddingService
     private readonly EmbeddingClient _embeddingClient;
     private readonly SearchClient _searchClient;
     private readonly ILogger<EmbeddingService> _logger;
-    private const string IndexName = "invoices";
-
     public EmbeddingService(
         IndexerConfig config,
+        AzureOpenAIClient openAiClient,
         TokenCredential credential,
         ILogger<EmbeddingService> logger)
     {
-        _embeddingClient = new AzureOpenAIClient(new Uri(config.OpenAiEndpoint), credential)
-            .GetEmbeddingClient("text-embedding-3-large");
+        _embeddingClient = openAiClient.GetEmbeddingClient(config.OpenAiEmbeddingDeployment);
 
         _searchClient = new SearchClient(
             new Uri(config.SearchEndpoint),
-            IndexName,
+            config.SearchIndexName,
             credential);
 
         _logger = logger;

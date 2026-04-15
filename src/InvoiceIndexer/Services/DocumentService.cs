@@ -17,14 +17,13 @@ public class DocumentService : IDocumentService
 
     public DocumentService(
         IndexerConfig config,
-        TokenCredential credential,
+        BlobServiceClient blobServiceClient,
         DocumentIntelligenceClient diClient,
         ILogger<DocumentService> logger)
     {
-        _containerClient = new BlobServiceClient(new Uri(config.StorageAccountUrl), credential)
-            .GetBlobContainerClient(config.StorageContainer);
-        _diClient = diClient;
-        _logger   = logger;
+        _containerClient = blobServiceClient.GetBlobContainerClient(config.StorageContainer);
+        _diClient        = diClient;
+        _logger          = logger;
     }
 
     public async Task<IEnumerable<BlobItem>> ReadBlobsAsync(CancellationToken ct = default)
