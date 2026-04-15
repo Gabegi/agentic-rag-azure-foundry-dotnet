@@ -22,27 +22,38 @@ jobs:
             --headers "Content-Type=application/json" \
             --body '{
               "name": "invoices",
+              "description": "Invoice index containing vendor, amount, discount, category, date and payment terms from PDF invoices.",
               "fields": [
-                { "name": "id",            "type": "Edm.String",         "key": true,  "searchable": false },
-                { "name": "vendor",        "type": "Edm.String",         "searchable": true, "filterable": true, "facetable": true },
-                { "name": "amount",        "type": "Edm.Double",         "searchable": false, "filterable": true, "sortable": true },
-                { "name": "discount",      "type": "Edm.Double",         "searchable": false, "filterable": true },
-                { "name": "category",      "type": "Edm.String",         "searchable": true, "filterable": true, "facetable": true },
-                { "name": "date",          "type": "Edm.DateTimeOffset", "filterable": true, "sortable": true },
-                { "name": "payment_terms", "type": "Edm.String",         "searchable": true, "filterable": true },
-                { "name": "content",       "type": "Edm.String",         "searchable": true },
-                { "name": "content_vector","type": "Collection(Edm.Single)", "searchable": true, "dimensions": 1536, "vectorSearchProfile": "vector-profile" }
+                { "name": "id",            "type": "Edm.String",         "key": true,  "searchable": false, "filterable": true,  "retrievable": true },
+                { "name": "vendor",        "type": "Edm.String",         "searchable": true,  "filterable": true,  "facetable": true,  "retrievable": true },
+                { "name": "amount",        "type": "Edm.Double",         "filterable": true,  "sortable": true,   "retrievable": true },
+                { "name": "discount",      "type": "Edm.Double",         "filterable": true,  "sortable": true,   "retrievable": true },
+                { "name": "category",      "type": "Edm.String",         "searchable": true,  "filterable": true,  "facetable": true,  "retrievable": true },
+                { "name": "date",          "type": "Edm.DateTimeOffset", "filterable": true,  "sortable": true,   "retrievable": true },
+                { "name": "payment_terms", "type": "Edm.String",         "searchable": true,  "filterable": true,  "retrievable": true },
+                { "name": "source_file",   "type": "Edm.String",         "filterable": true,  "retrievable": true },
+                { "name": "content",       "type": "Edm.String",         "searchable": true,  "retrievable": true, "analyzer": "en.microsoft" },
+                { "name": "content_vector","type": "Collection(Edm.Single)", "searchable": true, "retrievable": false, "stored": false, "dimensions": 1536, "vectorSearchProfile": "vector-profile" }
               ],
-              "vectorSearch": {
-                "profiles":              [{ "name": "vector-profile", "algorithm": "hnsw-config" }],
-                "algorithms": [{ "name": "hnsw-config", "kind": "hnsw" }]
-              },
               "semantic": {
+                "defaultConfiguration": "semantic-config",
                 "configurations": [{
                   "name": "semantic-config",
                   "prioritizedFields": {
                     "prioritizedContentFields":  [{ "fieldName": "content" }],
                     "prioritizedKeywordsFields": [{ "fieldName": "vendor" }, { "fieldName": "category" }]
+                  }
+                }]
+              },
+              "vectorSearch": {
+                "algorithms": [{ "name": "hnsw-config", "kind": "hnsw", "hnswParameters": { "metric": "cosine" } }],
+                "profiles":   [{ "name": "vector-profile", "algorithm": "hnsw-config", "vectorizer": "openai-vectorizer" }],
+                "vectorizers": [{
+                  "name": "openai-vectorizer", "kind": "azureOpenAI",
+                  "azureOpenAIParameters": {
+                    "resourceUri":  "${{ secrets.OPENAI_ENDPOINT }}",
+                    "deploymentId": "text-embedding-ada-002",
+                    "modelName":    "text-embedding-ada-002"
                   }
                 }]
               }
