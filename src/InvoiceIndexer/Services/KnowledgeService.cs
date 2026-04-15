@@ -30,8 +30,8 @@ public class KnowledgeService : IKnowledgeService
         _logger.LogInformation("Creating knowledge source '{Name}'", KnowledgeSourceName);
 
         var knowledgeSource = new SearchIndexKnowledgeSource(
-            name: KnowledgeSourceName,
-            searchIndexParameters: new SearchIndexKnowledgeSourceParameters(IndexName)
+            name: _config.KnowledgeSourceName,
+            searchIndexParameters: new SearchIndexKnowledgeSourceParameters(_config.SearchIndexName)
             {
                 SourceDataFields =
                 {
