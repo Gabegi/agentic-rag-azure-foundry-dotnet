@@ -1,6 +1,5 @@
 using Azure;
 using Azure.AI.DocumentIntelligence;
-using Azure.Core;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using InvoiceIndexer.Configuration;

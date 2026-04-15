@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 
-namespace InvoiceIndexer;
+namespace InvoiceIndexer.Services;
 
 public class PipelineOrchestrator : IPipelineOrchestrator
 {
