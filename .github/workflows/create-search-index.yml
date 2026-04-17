@@ -4,6 +4,11 @@ on:
   workflow_dispatch:
 
 jobs:
+  
+  deploy:
+    runs-on: [self-hosted]
+    environment: production
+  
   create-index:
     runs-on: ubuntu-latest
     steps:
