@@ -4,19 +4,17 @@ on:
   workflow_dispatch:
 
 jobs:
-
-  deploy:
+  upload:
     runs-on: [self-hosted]
     environment: production
-  
-  upload:
-    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: azure/login@v2
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          auth-type: IDENTITY
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Upload to Azure Blob
         run: |
@@ -27,5 +25,5 @@ jobs:
               --file "$file" \
               --name "${file#./invoices/}" \
               --overwrite true \
-              --auth-mode key
+              --auth-mode login
           done
