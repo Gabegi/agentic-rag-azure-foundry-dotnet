@@ -19,5 +19,13 @@ jobs:
       - uses: hashicorp/setup-terraform@v2
       - run: terraform init
         working-directory: ./infra
-      - run: terraform destroy -auto-approve
+        env:
+          ARM_USE_MSI: true
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      - run: terraform destroy -auto-approve -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}"
         working-directory: ./infra
+        env:
+          ARM_USE_MSI: true
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
