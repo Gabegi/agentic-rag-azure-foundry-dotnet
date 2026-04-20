@@ -26,8 +26,8 @@ terraform {
 provider "azapi" {}
 
 provider "azurerm" {
+    resource_provider_registrations = "none"
   features {
-      resource_provider_registrations = "none"
     resource_group {
       prevent_deletion_if_contains_resources = false
     }
