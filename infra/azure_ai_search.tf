@@ -1,5 +1,5 @@
 resource "azurerm_search_service" "main" {
-  name                = "srch-rag-invoices-dev"
+  name                = "srch-rag-invoices-test"
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
   sku                 = "standard" # Required for semantic ranker + vector search
