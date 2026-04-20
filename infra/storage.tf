@@ -4,7 +4,7 @@
 data "azurerm_client_config" "current" {}
 
 resource "azurerm_storage_account" "documents" {
-  name                     = "stinvdocsdev-test"
+  name                     = "stinvdocstest"
   resource_group_name      = azurerm_resource_group.main.name
   location                 = azurerm_resource_group.main.location
   account_tier             = "Standard"
