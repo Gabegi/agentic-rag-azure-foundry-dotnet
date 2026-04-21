@@ -1,0 +1,100 @@
+resource "azurerm_user_assigned_identity" "aci" {
+  name                = "mi-invoice-indexer-dev"
+  resource_group_name = azurerm_resource_group.main.name
+  location            = azurerm_resource_group.main.location
+}
+
+# ACR pull
+resource "azurerm_role_assignment" "aci_acr_pull" {
+  scope                = azurerm_container_registry.main.id
+  role_definition_name = "AcrPull"
+  principal_id         = azurerm_user_assigned_identity.aci.principal_id
+}
+
+# Storage
+resource "azurerm_role_assignment" "aci_blob_reader" {
+  scope                = azurerm_storage_account.documents.id
+  role_definition_name = "Storage Blob Data Reader"
+  principal_id         = azurerm_user_assigned_identity.aci.principal_id
+}
+
+# AI Search
+resource "azurerm_role_assignment" "aci_search_index_contributor" {
+  scope                = azurerm_search_service.main.id
+  role_definition_name = "Search Index Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.aci.principal_id
+}
+
+resource "azurerm_role_assignment" "aci_search_service_contributor" {
+  scope                = azurerm_search_service.main.id
+  role_definition_name = "Search Service Contributor"
+  principal_id         = azurerm_user_assigned_identity.aci.principal_id
+}
+
+# Azure OpenAI
+resource "azurerm_role_assignment" "aci_openai_user" {
+  scope                = azurerm_cognitive_account.openai.id
+  role_definition_name = "Cognitive Services OpenAI User"
+  principal_id         = azurerm_user_assigned_identity.aci.principal_id
+}
+
+# Document Intelligence
+resource "azurerm_role_assignment" "aci_di_user" {
+  scope                = azurerm_cognitive_account.document_intelligence.id
+  role_definition_name = "Cognitive Services User"
+  principal_id         = azurerm_user_assigned_identity.aci.principal_id
+}
+
+resource "azurerm_container_group" "invoice_indexer" {
+  name                = "aci-invoice-indexer-dev"
+  resource_group_name = azurerm_resource_group.main.name
+  location            = azurerm_resource_group.main.location
+  os_type             = "Linux"
+  restart_policy      = "Never"
+
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.aci.id]
+  }
+
+  image_registry_credential {
+    server                    = azurerm_container_registry.main.login_server
+    user_assigned_identity_id = azurerm_user_assigned_identity.aci.id
+  }
+
+  container {
+    name   = "invoice-indexer"
+    image  = "${azurerm_container_registry.main.login_server}/invoice-indexer:latest"
+    cpu    = "1"
+    memory = "2"
+
+    environment_variables = {
+      SEARCH_ENDPOINT                = "https://${azurerm_search_service.main.name}.search.windows.net"
+      OPENAI_ENDPOINT                = azurerm_cognitive_account.openai.endpoint
+      OPENAI_EMBEDDING_DEPLOYMENT    = var.openai_embedding_deployment
+      OPENAI_GPT_DEPLOYMENT          = var.openai_gpt_deployment
+      OPENAI_GPT_MODEL_NAME          = var.openai_gpt_model_name
+      STORAGE_ACCOUNT_URL            = azurerm_storage_account.documents.primary_blob_endpoint
+      STORAGE_CONTAINER              = azurerm_storage_container.documents.name
+      SEARCH_INDEX_NAME              = var.search_index_name
+      KNOWLEDGE_SOURCE_NAME          = var.knowledge_source_name
+      KNOWLEDGE_BASE_NAME            = var.knowledge_base_name
+      DOCUMENT_INTELLIGENCE_ENDPOINT = azurerm_cognitive_account.document_intelligence.endpoint
+      AZURE_CLIENT_ID                = azurerm_user_assigned_identity.aci.client_id
+    }
+  }
+
+  tags = {
+    project     = "support-agent"
+    environment = "dev"
+  }
+
+  depends_on = [
+    azurerm_role_assignment.aci_acr_pull,
+    azurerm_role_assignment.aci_blob_reader,
+    azurerm_role_assignment.aci_search_index_contributor,
+    azurerm_role_assignment.aci_search_service_contributor,
+    azurerm_role_assignment.aci_openai_user,
+    azurerm_role_assignment.aci_di_user,
+  ]
+}
