@@ -64,7 +64,7 @@ resource "azurerm_container_group" "invoice_indexer" {
 
   container {
     name   = "invoice-indexer"
-    image  = "mcr.microsoft.com/azuredocs/aci-helloworld"
+    image  = "${azurerm_container_registry.main.login_server}/invoice-indexer:${var.indexer_image_tag}"
     cpu    = "1"
     memory = "2"
 
