@@ -75,7 +75,7 @@ resource "azurerm_container_group" "invoice_indexer" {
 
     environment_variables = {
       SEARCH_ENDPOINT                = "https://${azurerm_search_service.main.name}.search.windows.net"
-      OPENAI_ENDPOINT                = azurerm_cognitive_account.openai.endpoint
+      OPENAI_ENDPOINT                = "https://${azurerm_cognitive_account.openai.custom_subdomain_name}.openai.azure.com/"
       OPENAI_EMBEDDING_DEPLOYMENT    = var.openai_embedding_deployment
       OPENAI_GPT_DEPLOYMENT          = var.openai_gpt_deployment
       OPENAI_GPT_MODEL_NAME          = var.openai_gpt_model_name

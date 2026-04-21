@@ -4,7 +4,7 @@ output "search_endpoint" {
 }
 
 output "openai_endpoint" {
-  value       = azurerm_cognitive_account.openai.endpoint
+  value       = "https://${azurerm_cognitive_account.openai.custom_subdomain_name}.openai.azure.com/"
   description = "OPENAI_ENDPOINT for InvoiceIndexer"
 }
 
