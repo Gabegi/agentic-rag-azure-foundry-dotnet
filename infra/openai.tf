@@ -34,7 +34,7 @@ resource "azurerm_cognitive_deployment" "querying" {
   model {
     format  = "OpenAI"
     name    = var.openai_gpt_model_name
-    version = "2024-07-18"
+    version = "2025-01-01-preview"
   }
 
   sku {

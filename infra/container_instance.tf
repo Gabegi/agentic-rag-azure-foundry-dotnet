@@ -68,6 +68,11 @@ resource "azurerm_container_group" "invoice_indexer" {
     cpu    = "1"
     memory = "2"
 
+    ports {
+      port     = 80
+      protocol = "TCP"
+    }
+
     environment_variables = {
       SEARCH_ENDPOINT                = "https://${azurerm_search_service.main.name}.search.windows.net"
       OPENAI_ENDPOINT                = azurerm_cognitive_account.openai.endpoint
