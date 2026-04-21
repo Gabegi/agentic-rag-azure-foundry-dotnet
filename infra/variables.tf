@@ -12,13 +12,13 @@ variable "openai_embedding_deployment" {
 variable "openai_gpt_deployment" {
   description = "Name of the Azure OpenAI GPT deployment"
   type        = string
-  default     = "gpt-4o-mini"
+  default     = "querying"
 }
 
 variable "openai_gpt_model_name" {
   description = "Model name for the Azure OpenAI GPT deployment"
   type        = string
-  default     = "gpt-4o-mini"
+  default     = "gpt-4o"
 }
 
 variable "search_index_name" {
