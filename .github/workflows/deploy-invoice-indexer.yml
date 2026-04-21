@@ -32,23 +32,17 @@ jobs:
             --file src/InvoiceIndexer/Dockerfile \
             src/InvoiceIndexer
 
-      - uses: hashicorp/setup-terraform@v2
-
-      - name: Terraform init
-        working-directory: ./infra
-        env:
-          ARM_USE_MSI: true
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-        run: terraform init
-
-      - name: Terraform apply with new image tag
-        working-directory: ./infra
-        env:
-          ARM_USE_MSI: true
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      - name: Update ACI image
         run: |
-          terraform apply -auto-approve \
-            -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
-            -var="indexer_image_tag=${{ github.sha }}"
+          az container create \
+            --resource-group rg-support-agent-dev \
+            --name aci-invoice-indexer-dev \
+            --image crragtest.azurecr.io/invoice-indexer:${{ github.sha }} \
+            --restart-policy Never \
+            --no-wait
+
+      - name: Start indexer
+        run: |
+          az container start \
+            --resource-group rg-support-agent-dev \
+            --name aci-invoice-indexer-dev

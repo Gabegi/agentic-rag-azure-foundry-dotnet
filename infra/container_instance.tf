@@ -64,7 +64,7 @@ resource "azurerm_container_group" "invoice_indexer" {
 
   container {
     name   = "invoice-indexer"
-    image  = "${azurerm_container_registry.main.login_server}/invoice-indexer:${var.indexer_image_tag}"
+    image  = "${azurerm_container_registry.main.login_server}/invoice-indexer:latest"
     cpu    = "1"
     memory = "2"
 
@@ -87,6 +87,10 @@ resource "azurerm_container_group" "invoice_indexer" {
       DOCUMENT_INTELLIGENCE_ENDPOINT = azurerm_cognitive_account.document_intelligence.endpoint
       AZURE_CLIENT_ID                = azurerm_user_assigned_identity.aci_indexer.client_id
     }
+  }
+
+  lifecycle {
+    ignore_changes = [container[0].image]
   }
 
   tags = {

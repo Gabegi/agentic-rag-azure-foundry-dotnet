@@ -38,9 +38,3 @@ variable "knowledge_base_name" {
   type        = string
   default     = "invoices-knowledge-base"
 }
-
-variable "indexer_image_tag" {
-  description = "Docker image tag for the invoice indexer container"
-  type        = string
-  default     = "latest"
-}
