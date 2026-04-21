@@ -1,3 +1,8 @@
+data "azurerm_virtual_machine" "runner" {
+  name                = "vm-github-runner"
+  resource_group_name = "rg-github-runner"
+}
+
 resource "azurerm_container_registry" "main" {
   name                = "crragtest"
   resource_group_name = azurerm_resource_group.main.name
