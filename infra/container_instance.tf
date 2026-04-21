@@ -89,6 +89,13 @@ resource "azurerm_container_group" "invoice_indexer" {
     }
   }
 
+  diagnostics {
+    log_analytics {
+      workspace_id  = azurerm_log_analytics_workspace.main.workspace_id
+      workspace_key = azurerm_log_analytics_workspace.main.primary_shared_key
+    }
+  }
+
   lifecycle {
     ignore_changes = [container[0].image]
   }
