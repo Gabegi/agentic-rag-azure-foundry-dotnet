@@ -16,9 +16,9 @@ resource "azurerm_container_registry" "main" {
   }
 }
 
-# Allow ACI to pull images from ACR
-resource "azurerm_role_assignment" "mi_acr_pull" {
+# Allow runner VM to push images to ACR
+resource "azurerm_role_assignment" "runner_acr_push" {
   scope                = azurerm_container_registry.main.id
-  role_definition_name = "AcrPull"
+  role_definition_name = "AcrPush"
   principal_id         = data.azurerm_virtual_machine.runner.identity[0].principal_id
 }
