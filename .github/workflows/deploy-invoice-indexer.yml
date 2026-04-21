@@ -32,15 +32,6 @@ jobs:
             --file src/InvoiceIndexer/Dockerfile \
             src/InvoiceIndexer
 
-      - name: Update ACI image
-        run: |
-          az container create \
-            --resource-group rg-support-agent-dev \
-            --name aci-invoice-indexer-dev \
-            --image crragtest.azurecr.io/invoice-indexer:${{ github.sha }} \
-            --restart-policy Never \
-            --no-wait
-
       - name: Start indexer
         run: |
           az container start \
