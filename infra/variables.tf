@@ -20,3 +20,21 @@ variable "openai_gpt_model_name" {
   type        = string
   default     = "gpt-4o-mini"
 }
+
+variable "search_index_name" {
+  description = "Name of the Azure AI Search index"
+  type        = string
+  default     = "invoices"
+}
+
+variable "knowledge_source_name" {
+  description = "Name of the AI Search knowledge source"
+  type        = string
+  default     = "invoices-knowledge-source"
+}
+
+variable "knowledge_base_name" {
+  description = "Name of the AI Search knowledge base"
+  type        = string
+  default     = "invoices-knowledge-base"
+}
