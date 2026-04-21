@@ -1,48 +1,48 @@
-resource "azurerm_user_assigned_identity" "aci" {
+resource "azurerm_user_assigned_identity" "aci_indexer" {
   name                = "mi-invoice-indexer-dev"
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
 }
 
 # ACR pull
-resource "azurerm_role_assignment" "aci_acr_pull" {
+resource "azurerm_role_assignment" "aci_indexer_acr_pull" {
   scope                = azurerm_container_registry.main.id
   role_definition_name = "AcrPull"
-  principal_id         = azurerm_user_assigned_identity.aci.principal_id
+  principal_id         = azurerm_user_assigned_identity.aci_indexer.principal_id
 }
 
 # Storage
-resource "azurerm_role_assignment" "aci_blob_reader" {
+resource "azurerm_role_assignment" "aci_indexer_blob_reader" {
   scope                = azurerm_storage_account.documents.id
   role_definition_name = "Storage Blob Data Reader"
-  principal_id         = azurerm_user_assigned_identity.aci.principal_id
+  principal_id         = azurerm_user_assigned_identity.aci_indexer.principal_id
 }
 
 # AI Search
-resource "azurerm_role_assignment" "aci_search_index_contributor" {
+resource "azurerm_role_assignment" "aci_indexer_search_index_contributor" {
   scope                = azurerm_search_service.main.id
   role_definition_name = "Search Index Data Contributor"
-  principal_id         = azurerm_user_assigned_identity.aci.principal_id
+  principal_id         = azurerm_user_assigned_identity.aci_indexer.principal_id
 }
 
-resource "azurerm_role_assignment" "aci_search_service_contributor" {
+resource "azurerm_role_assignment" "aci_indexer_search_service_contributor" {
   scope                = azurerm_search_service.main.id
   role_definition_name = "Search Service Contributor"
-  principal_id         = azurerm_user_assigned_identity.aci.principal_id
+  principal_id         = azurerm_user_assigned_identity.aci_indexer.principal_id
 }
 
 # Azure OpenAI
-resource "azurerm_role_assignment" "aci_openai_user" {
+resource "azurerm_role_assignment" "aci_indexer_openai_user" {
   scope                = azurerm_cognitive_account.openai.id
   role_definition_name = "Cognitive Services OpenAI User"
-  principal_id         = azurerm_user_assigned_identity.aci.principal_id
+  principal_id         = azurerm_user_assigned_identity.aci_indexer.principal_id
 }
 
 # Document Intelligence
-resource "azurerm_role_assignment" "aci_di_user" {
+resource "azurerm_role_assignment" "aci_indexer_di_user" {
   scope                = azurerm_cognitive_account.document_intelligence.id
   role_definition_name = "Cognitive Services User"
-  principal_id         = azurerm_user_assigned_identity.aci.principal_id
+  principal_id         = azurerm_user_assigned_identity.aci_indexer.principal_id
 }
 
 resource "azurerm_container_group" "invoice_indexer" {
@@ -54,12 +54,12 @@ resource "azurerm_container_group" "invoice_indexer" {
 
   identity {
     type         = "UserAssigned"
-    identity_ids = [azurerm_user_assigned_identity.aci.id]
+    identity_ids = [azurerm_user_assigned_identity.aci_indexer.id]
   }
 
   image_registry_credential {
     server                    = azurerm_container_registry.main.login_server
-    user_assigned_identity_id = azurerm_user_assigned_identity.aci.id
+    user_assigned_identity_id = azurerm_user_assigned_identity.aci_indexer.id
   }
 
   container {
@@ -80,7 +80,7 @@ resource "azurerm_container_group" "invoice_indexer" {
       KNOWLEDGE_SOURCE_NAME          = var.knowledge_source_name
       KNOWLEDGE_BASE_NAME            = var.knowledge_base_name
       DOCUMENT_INTELLIGENCE_ENDPOINT = azurerm_cognitive_account.document_intelligence.endpoint
-      AZURE_CLIENT_ID                = azurerm_user_assigned_identity.aci.client_id
+      AZURE_CLIENT_ID                = azurerm_user_assigned_identity.aci_indexer.client_id
     }
   }
 
@@ -90,11 +90,11 @@ resource "azurerm_container_group" "invoice_indexer" {
   }
 
   depends_on = [
-    azurerm_role_assignment.aci_acr_pull,
-    azurerm_role_assignment.aci_blob_reader,
-    azurerm_role_assignment.aci_search_index_contributor,
-    azurerm_role_assignment.aci_search_service_contributor,
-    azurerm_role_assignment.aci_openai_user,
-    azurerm_role_assignment.aci_di_user,
+    azurerm_role_assignment.aci_indexer_acr_pull,
+    azurerm_role_assignment.aci_indexer_blob_reader,
+    azurerm_role_assignment.aci_indexer_search_index_contributor,
+    azurerm_role_assignment.aci_indexer_search_service_contributor,
+    azurerm_role_assignment.aci_indexer_openai_user,
+    azurerm_role_assignment.aci_indexer_di_user,
   ]
 }
