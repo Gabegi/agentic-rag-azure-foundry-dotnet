@@ -27,7 +27,7 @@ public class KnowledgeService : IKnowledgeService
 
     public async Task EnsureKnowledgeSourceAsync(CancellationToken ct = default)
     {
-        _logger.LogInformation("Creating knowledge source '{Name}'", KnowledgeSourceName);
+        _logger.LogInformation("Creating knowledge source '{Name}'", _config.KnowledgeSourceName);
 
         var knowledgeSource = new SearchIndexKnowledgeSource(
             name: _config.KnowledgeSourceName,
@@ -47,12 +47,12 @@ public class KnowledgeService : IKnowledgeService
 
         await _indexClient.CreateOrUpdateKnowledgeSourceAsync(knowledgeSource);
 
-        _logger.LogInformation("Knowledge source '{Name}' created or updated", KnowledgeSourceName);
+        _logger.LogInformation("Knowledge source '{Name}' created or updated", _config.KnowledgeSourceName);
     }
 
     public async Task EnsureKnowledgeBaseAsync(CancellationToken ct = default)
     {
-        _logger.LogInformation("Creating knowledge base '{Name}'", KnowledgeBaseName);
+        _logger.LogInformation("Creating knowledge base '{Name}'", _config.KnowledgeBaseName);
 
         var aoaiParams = new AzureOpenAIVectorizerParameters
         {
@@ -74,6 +74,6 @@ public class KnowledgeService : IKnowledgeService
 
         await _indexClient.CreateOrUpdateKnowledgeBaseAsync(knowledgeBase);
 
-        _logger.LogInformation("Knowledge base '{Name}' created or updated", KnowledgeBaseName);
+        _logger.LogInformation("Knowledge base '{Name}' created or updated", _config.KnowledgeBaseName);
     }
 }
