@@ -1,9 +1,10 @@
-name: Deploy Invoice Indexer
+name: 3 - Deploy Invoice Indexer
 
 on:
   workflow_dispatch:
   workflow_run:
-    workflows: ["Deploy Infrastructure"]
+    workflows: ["1 - Deploy Infrastructure"]
+
     types:
       - completed
 

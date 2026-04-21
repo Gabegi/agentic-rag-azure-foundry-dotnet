@@ -1,4 +1,4 @@
-name: Upload Invoices to Azure Blob
+name: 2 - Upload Invoices
 
 on:
   workflow_dispatch:
