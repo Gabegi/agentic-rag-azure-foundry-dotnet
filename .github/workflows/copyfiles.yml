@@ -20,7 +20,7 @@ jobs:
         run: |
           find ./invoices -name "*.pdf" | head -500 | while read file; do
             az storage blob upload \
-              --account-name stinvdocsdev \
+              --account-name stinvdocstest \
               --container-name documents \
               --file "$file" \
               --name "${file#./invoices/}" \
