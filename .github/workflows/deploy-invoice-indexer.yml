@@ -32,6 +32,8 @@ jobs:
             --file src/InvoiceIndexer/Dockerfile \
             src/InvoiceIndexer
 
+      - uses: hashicorp/setup-terraform@v2
+
       - name: Terraform init
         working-directory: ./infra
         env:
