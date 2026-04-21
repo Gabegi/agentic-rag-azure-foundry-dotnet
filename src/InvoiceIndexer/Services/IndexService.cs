@@ -27,9 +27,9 @@ public class IndexService : IIndexService
         {
             Parameters = new AzureOpenAIVectorizerParameters
             {
-                ResourceUri    = new Uri(_config.OpenAiEndpoint),
-                DeploymentName = "text-embedding-3-large",
-                ModelName      = "text-embedding-3-large"
+                ResourceUri    = new Uri(_config.OpenAiEndpoint.TrimEnd('/')),
+                DeploymentName = _config.OpenAiEmbeddingDeployment,
+                ModelName      = _config.OpenAiEmbeddingDeployment
             }
         });
 
