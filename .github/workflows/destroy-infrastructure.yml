@@ -2,12 +2,28 @@ name: Destroy Infrastructure
 
 on:
   workflow_dispatch:
+    inputs:
+      confirmation:
+        description: "⚠️ Type DESTROY to confirm you want to tear down all infrastructure"
+        required: true
 
 jobs:
   destroy:
     runs-on: [self-hosted]
-    environment: production
+    environment: destroy
     steps:
+      - name: Confirm destruction intent
+        if: ${{ github.event.inputs.confirmation != 'DESTROY' }}
+        run: |
+          echo "❌ Confirmation failed. You must type DESTROY exactly to proceed."
+          exit 1
+
+      - name: Warning
+        run: |
+          echo "⚠️  WARNING: This will permanently destroy all infrastructure in rg-support-agent-dev."
+          echo "Proceeding in 10 seconds..."
+          sleep 10
+
       - uses: actions/checkout@v4
 
       - uses: azure/login@v2
