@@ -26,18 +26,27 @@ public class PipelineOrchestrator : IPipelineOrchestrator
 
     public async Task RunAsync(CancellationToken ct = default)
     {
-        _logger.LogInformation("Pipeline started");
+        var sw = System.Diagnostics.Stopwatch.StartNew();
 
         await _indexService.EnsureIndexAsync();
 
-        var blobs     = await _documentService.ReadBlobsAsync(ct);
-        var extracted = await _documentService.ExtractDocumentsAsync(blobs, ct);
+        var blobs = await _documentService.ReadBlobsAsync(ct);
+        var blobList = blobs.ToList();
+
+        _logger.LogInformation("Pipeline started — {Count} blobs found", blobList.Count);
+
+        var extracted = await _documentService.ExtractDocumentsAsync(blobList, ct);
         var embedded  = await _embeddingService.EmbedDocumentsAsync(extracted, ct);
-        await _embeddingService.UploadDocumentsAsync(embedded, ct);
+
+        var embeddedList = embedded.ToList();
+        var failed       = blobList.Count - embeddedList.Count;
+
+        await _embeddingService.UploadDocumentsAsync(embeddedList, ct);
 
         await _knowledgeService.EnsureKnowledgeSourceAsync(ct);
         await _knowledgeService.EnsureKnowledgeBaseAsync(ct);
 
-        _logger.LogInformation("Pipeline complete");
+        _logger.LogInformation("Pipeline complete — {Success} succeeded, {Failed} failed in {Ms}ms",
+            embeddedList.Count, failed, sw.ElapsedMilliseconds);
     }
 }
