@@ -89,7 +89,8 @@ public class DocumentService : IDocumentService
 
             documents.Add(new InvoiceDocument
             {
-                Id           = blob.Name.Replace(".pdf", "").Replace("/", "-"),
+                // Azure AI Search keys only allow letters, digits, _ - = — Base64 encode to handle spaces and + in blob names
+                Id           = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(blob.Name)).Replace("+", "-").Replace("/", "_").Replace("=", ""),
                 SourceFile   = blob.Name,
                 Vendor       = vendor,
                 Amount       = amount,
