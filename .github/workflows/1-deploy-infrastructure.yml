@@ -25,7 +25,7 @@ jobs:
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
 
-      - run: terraform apply -auto-approve -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+      - run: terraform apply -auto-approve -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" -var="alert_email=gabriel.pirastru@devoteam.com"
         working-directory: ./infra
         env:
           ARM_USE_MSI: true
