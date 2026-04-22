@@ -33,10 +33,24 @@ public class KnowledgeService : IKnowledgeService
             name: _config.KnowledgeSourceName,
             searchIndexParameters: new SearchIndexKnowledgeSourceParameters(_config.SearchIndexName)
             {
+                // Limit BM25 to fields that carry semantic meaning; avoids noise from payment_terms etc.
+                SearchFields =
+                {
+                    new SearchIndexFieldReference("content"),
+                    new SearchIndexFieldReference("vendor"),
+                    new SearchIndexFieldReference("category")
+                },
+                // All structured fields returned so the model has full invoice context
                 SourceDataFields =
                 {
                     new SearchIndexFieldReference("id"),
                     new SearchIndexFieldReference("source_file"),
+                    new SearchIndexFieldReference("vendor"),
+                    new SearchIndexFieldReference("category"),
+                    new SearchIndexFieldReference("amount"),
+                    new SearchIndexFieldReference("discount"),
+                    new SearchIndexFieldReference("date"),
+                    new SearchIndexFieldReference("payment_terms"),
                     new SearchIndexFieldReference("content")
                 }
             }

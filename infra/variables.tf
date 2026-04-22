@@ -39,11 +39,6 @@ variable "knowledge_base_name" {
   default     = "invoices-knowledge-base"
 }
 
-variable "alert_email" {
-  description = "Email address for search throttling alert notifications"
-  type        = string
-}
-
 variable "indexer_image_tag" {
   description = "Docker image tag for the invoice indexer container"
   type        = string

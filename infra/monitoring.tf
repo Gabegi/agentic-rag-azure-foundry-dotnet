@@ -5,7 +5,7 @@ resource "azurerm_monitor_action_group" "main" {
 
   email_receiver {
     name          = "admin"
-    email_address = var.alert_email
+    email_address = "gabriel.pirastru@devoteam.com"
   }
 }
 
