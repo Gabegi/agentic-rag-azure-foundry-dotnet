@@ -2,6 +2,7 @@ using Azure.Core;
 using Azure.Search.Documents.Indexes;
 using Azure.Search.Documents.Indexes.Models;
 using InvoiceIndexer.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace InvoiceIndexer.Services;
 
@@ -9,10 +10,13 @@ public class IndexService : IIndexService
 {
     private readonly SearchIndexClient _indexClient;
     private readonly IndexerConfig _config;
-    public IndexService(IndexerConfig config, TokenCredential credential)
+    private readonly ILogger<IndexService> _logger;
+
+    public IndexService(IndexerConfig config, TokenCredential credential, ILogger<IndexService> logger)
     {
         _config      = config;
         _indexClient = new SearchIndexClient(new Uri(config.SearchEndpoint), credential);
+        _logger      = logger;
     }
 
     public async Task EnsureIndexAsync()
@@ -64,5 +68,7 @@ public class IndexService : IIndexService
         };
 
         await _indexClient.CreateOrUpdateIndexAsync(index);
+
+        _logger.LogInformation("Index '{Name}' created or updated", _config.SearchIndexName);
     }
 }

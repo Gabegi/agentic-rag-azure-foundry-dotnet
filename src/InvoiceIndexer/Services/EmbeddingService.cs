@@ -50,7 +50,7 @@ public class EmbeddingService : IEmbeddingService
             _logger.LogInformation("Embedded document {Id}", document.Id);
         }
 
-        _logger.LogInformation("Embedded {Count} documents", embedded.Count);
+        _logger.LogInformation("Documents embedded — {Count}", embedded.Count);
         return embedded;
     }
 
