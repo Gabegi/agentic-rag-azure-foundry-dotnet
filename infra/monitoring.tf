@@ -24,7 +24,7 @@ resource "azurerm_monitor_scheduled_query_rules_alert_v2" "throttling" {
     query = <<-QUERY
       AzureDiagnostics
       | where ResourceProvider == "MICROSOFT.SEARCH"
-      | where resultSignature_s == "503"
+      | where tostring(resultSignature_d) == "503"
       | summarize ThrottledRequests = count()
     QUERY
 
