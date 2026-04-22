@@ -26,6 +26,7 @@ resource "azurerm_monitor_scheduled_query_rules_alert_v2" "throttling" {
       | where ResourceProvider == "MICROSOFT.SEARCH"
       | where tostring(resultSignature_d) == "503"
       | summarize ThrottledRequests = count()
+      | where ThrottledRequests > 0
     QUERY
 
     time_aggregation_method = "Count"
@@ -109,6 +110,7 @@ resource "azurerm_monitor_scheduled_query_rules_alert_v2" "indexing_impact" {
       | join kind=inner searchOps on TimeGenerated
       | where AvgLatencyMs > 2000 and IndexingCount > 0
       | summarize Count = count()
+      | where Count > 0
     QUERY
 
     time_aggregation_method = "Count"
