@@ -1,4 +1,4 @@
-# Azure AI Foundry — Invoice Indexer (RAG)
+# Azure AI Foundry — Invoice Indexer (Agentic Retrieval)
 
 A .NET batch pipeline that ingests PDF invoices from Azure Blob Storage, extracts structured data via Document Intelligence, generates vector embeddings, and indexes everything into Azure AI Search — ready to be queried via an Azure AI Foundry knowledge base.
 
