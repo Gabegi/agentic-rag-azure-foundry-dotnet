@@ -9,6 +9,7 @@ resource "azurerm_monitor_action_group" "main" {
   }
 }
 
+# 1. Throttling — fires when any 503 occurs
 resource "azurerm_monitor_scheduled_query_rules_alert_v2" "throttling" {
   name                = "alert-search-throttling-dev"
   resource_group_name = azurerm_resource_group.main.name
@@ -42,5 +43,88 @@ resource "azurerm_monitor_scheduled_query_rules_alert_v2" "throttling" {
   }
 
   description = "Fires when any 503 throttling occurs on the search service"
+  enabled     = true
+}
+
+# 2. Query latency — fires when average latency exceeds 2000ms
+resource "azurerm_monitor_scheduled_query_rules_alert_v2" "query_latency" {
+  name                = "alert-search-query-latency-dev"
+  resource_group_name = azurerm_resource_group.main.name
+  location            = azurerm_resource_group.main.location
+
+  evaluation_frequency = "PT5M"
+  window_duration      = "PT5M"
+  scopes               = [azurerm_log_analytics_workspace.main.id]
+  severity             = 2
+
+  criteria {
+    query = <<-QUERY
+      AzureDiagnostics
+      | where ResourceProvider == "MICROSOFT.SEARCH"
+      | where OperationName == "Query.Search"
+      | summarize AvgLatencyMs = avg(DurationMs)
+    QUERY
+
+    time_aggregation_method = "Average"
+    threshold               = 2000
+    operator                = "GreaterThan"
+    metric_measure_column   = "AvgLatencyMs"
+
+    failing_periods {
+      minimum_failing_periods_to_trigger_alert = 1
+      number_of_evaluation_periods             = 1
+    }
+  }
+
+  action {
+    action_groups = [azurerm_monitor_action_group.main.id]
+  }
+
+  description = "Fires when average query latency exceeds 2000ms"
+  enabled     = true
+}
+
+# 3. Indexing impact — fires when indexing and high latency overlap
+resource "azurerm_monitor_scheduled_query_rules_alert_v2" "indexing_impact" {
+  name                = "alert-search-indexing-impact-dev"
+  resource_group_name = azurerm_resource_group.main.name
+  location            = azurerm_resource_group.main.location
+
+  evaluation_frequency = "PT5M"
+  window_duration      = "PT5M"
+  scopes               = [azurerm_log_analytics_workspace.main.id]
+  severity             = 3
+
+  criteria {
+    query = <<-QUERY
+      let indexing = AzureDiagnostics
+        | where ResourceProvider == "MICROSOFT.SEARCH"
+        | where OperationName startswith "Indexing"
+        | summarize IndexingCount = count() by bin(TimeGenerated, 1m);
+      let queries = AzureDiagnostics
+        | where ResourceProvider == "MICROSOFT.SEARCH"
+        | where OperationName == "Query.Search"
+        | summarize AvgLatencyMs = avg(DurationMs) by bin(TimeGenerated, 1m);
+      indexing
+      | join kind=inner queries on TimeGenerated
+      | where AvgLatencyMs > 2000 and IndexingCount > 0
+      | summarize Count = count()
+    QUERY
+
+    time_aggregation_method = "Count"
+    threshold               = 1
+    operator                = "GreaterThanOrEqual"
+
+    failing_periods {
+      minimum_failing_periods_to_trigger_alert = 1
+      number_of_evaluation_periods             = 1
+    }
+  }
+
+  action {
+    action_groups = [azurerm_monitor_action_group.main.id]
+  }
+
+  description = "Fires when indexing activity coincides with high query latency"
   enabled     = true
 }
