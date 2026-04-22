@@ -1,7 +1,10 @@
+using System.Collections.Concurrent;
 using Azure;
 using Azure.AI.DocumentIntelligence;
+using Azure.Search.Documents;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
+using Azure.Core;
 using InvoiceIndexer.Configuration;
 using InvoiceIndexer.Models;
 using Microsoft.Extensions.Logging;
@@ -12,16 +15,19 @@ public class DocumentService : IDocumentService
 {
     private readonly BlobContainerClient _containerClient;
     private readonly DocumentIntelligenceClient _diClient;
+    private readonly SearchClient _searchClient;
     private readonly ILogger<DocumentService> _logger;
 
     public DocumentService(
         IndexerConfig config,
         BlobServiceClient blobServiceClient,
         DocumentIntelligenceClient diClient,
+        TokenCredential credential,
         ILogger<DocumentService> logger)
     {
         _containerClient = blobServiceClient.GetBlobContainerClient(config.StorageContainer);
         _diClient        = diClient;
+        _searchClient    = new SearchClient(new Uri(config.SearchEndpoint), config.SearchIndexName, credential);
         _logger          = logger;
     }
 
@@ -42,74 +48,104 @@ public class DocumentService : IDocumentService
             blobs.Add(blob);
         }
 
-        _logger.LogInformation("Found {Count} PDF blobs", blobs.Count);
-        return blobs;
+        var existingIds = await GetExistingIdsAsync(blobs, ct);
+        var newBlobs    = blobs.Where(b => !existingIds.Contains(BlobNameToId(b.Name))).ToList();
+
+        _logger.LogInformation("Found {Total} PDF blobs — {New} new, {Skipped} already indexed",
+            blobs.Count, newBlobs.Count, blobs.Count - newBlobs.Count);
+
+        return newBlobs;
     }
 
     public async Task<IEnumerable<InvoiceDocument>> ExtractDocumentsAsync(
         IEnumerable<BlobItem> blobs,
         CancellationToken ct = default)
     {
-        var documents = new List<InvoiceDocument>();
-        var sw        = new System.Diagnostics.Stopwatch();
+        var documents = new ConcurrentBag<InvoiceDocument>();
 
-        foreach (var blob in blobs)
-        {
-            sw.Restart();
-
-            try
+        await Parallel.ForEachAsync(blobs,
+            new ParallelOptions { MaxDegreeOfParallelism = 10, CancellationToken = ct },
+            async (blob, token) =>
             {
-                var blobClient = _containerClient.GetBlobClient(blob.Name);
-                var download   = await blobClient.DownloadContentAsync(ct);
-
-                var operation = await _diClient.AnalyzeDocumentAsync(
-                    WaitUntil.Completed,
-                    "prebuilt-invoice",
-                    download.Value.Content,
-                    cancellationToken: ct);
-
-                var invoice = operation.Value.Documents?.FirstOrDefault();
-
-                if (invoice == null)
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                try
                 {
-                    _logger.LogWarning("No invoice found in {Name}", blob.Name);
-                    continue;
+                    var blobClient = _containerClient.GetBlobClient(blob.Name);
+                    var download   = await blobClient.DownloadContentAsync(token);
+
+                    var operation = await _diClient.AnalyzeDocumentAsync(
+                        WaitUntil.Completed,
+                        "prebuilt-invoice",
+                        download.Value.Content,
+                        cancellationToken: token);
+
+                    var invoice = operation.Value.Documents?.FirstOrDefault();
+
+                    if (invoice == null)
+                    {
+                        _logger.LogWarning("No invoice found in {Name}", blob.Name);
+                        return;
+                    }
+
+                    var vendor       = invoice.Fields.TryGetValue("VendorName",    out var v)  ? v.Content     : null;
+                    var amount       = invoice.Fields.TryGetValue("InvoiceTotal",  out var a)  ? a.ValueDouble : null;
+                    var discount     = invoice.Fields.TryGetValue("TotalDiscount", out var d)  ? d.ValueDouble : null;
+                    var category     = invoice.Fields.TryGetValue("PurchaseOrder", out var c)  ? c.Content     : null;
+                    var date         = invoice.Fields.TryGetValue("InvoiceDate",   out var dt) ? dt.ValueDate  : null;
+                    var paymentTerms = invoice.Fields.TryGetValue("PaymentTerm",   out var p)  ? p.Content     : null;
+
+                    var content = $"Invoice from {vendor} dated {date:yyyy-MM-dd}. " +
+                                  $"Category: {category}. Amount: ${amount}. "       +
+                                  $"Discount: {discount}%. Payment terms: {paymentTerms}.";
+
+                    documents.Add(new InvoiceDocument
+                    {
+                        // Azure AI Search keys only allow letters, digits, _ - = — Base64 encode to handle spaces and + in blob names
+                        Id           = BlobNameToId(blob.Name),
+                        SourceFile   = blob.Name,
+                        Vendor       = vendor,
+                        Amount       = amount,
+                        Discount     = discount,
+                        Category     = category,
+                        Date         = date,
+                        PaymentTerms = paymentTerms,
+                        Content      = content
+                    });
+
+                    _logger.LogInformation("Processed {Name} in {Ms}ms", blob.Name, sw.ElapsedMilliseconds);
                 }
-
-                var vendor       = invoice.Fields.TryGetValue("VendorName",    out var v)  ? v.Content     : null;
-                var amount       = invoice.Fields.TryGetValue("InvoiceTotal",  out var a)  ? a.ValueDouble : null;
-                var discount     = invoice.Fields.TryGetValue("TotalDiscount", out var d)  ? d.ValueDouble : null;
-                var category     = invoice.Fields.TryGetValue("PurchaseOrder", out var c)  ? c.Content     : null;
-                var date         = invoice.Fields.TryGetValue("InvoiceDate",   out var dt) ? dt.ValueDate  : null;
-                var paymentTerms = invoice.Fields.TryGetValue("PaymentTerm",   out var p)  ? p.Content     : null;
-
-                var content = $"Invoice from {vendor} dated {date:yyyy-MM-dd}. " +
-                              $"Category: {category}. Amount: ${amount}. "       +
-                              $"Discount: {discount}%. Payment terms: {paymentTerms}.";
-
-                documents.Add(new InvoiceDocument
+                catch (Exception ex)
                 {
-                    // Azure AI Search keys only allow letters, digits, _ - = — Base64 encode to handle spaces and + in blob names
-                    Id           = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(blob.Name)).Replace("+", "-").Replace("/", "_").Replace("=", ""),
-                    SourceFile   = blob.Name,
-                    Vendor       = vendor,
-                    Amount       = amount,
-                    Discount     = discount,
-                    Category     = category,
-                    Date         = date,
-                    PaymentTerms = paymentTerms,
-                    Content      = content
-                });
-
-                _logger.LogInformation("Processed {Name} in {Ms}ms", blob.Name, sw.ElapsedMilliseconds);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("Failed to process {Name}: {Error}", blob.Name, ex.Message);
-            }
-        }
+                    _logger.LogError("Failed to process {Name}: {Error}", blob.Name, ex.Message);
+                }
+            });
 
         _logger.LogInformation("Extracted {Count} documents", documents.Count);
         return documents;
+    }
+
+    private static string BlobNameToId(string blobName) =>
+        Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(blobName))
+            .Replace("+", "-").Replace("/", "_").Replace("=", "");
+
+    private async Task<HashSet<string>> GetExistingIdsAsync(IEnumerable<BlobItem> blobs, CancellationToken ct)
+    {
+        var ids     = blobs.Select(b => BlobNameToId(b.Name)).ToList();
+        var existing = new HashSet<string>();
+
+        // Fetch in batches of 1000 (Search $filter length limit)
+        foreach (var batch in ids.Chunk(1000))
+        {
+            var filter  = string.Join(" or ", batch.Select(id => $"id eq '{id}'"));
+            var options = new Azure.Search.Documents.SearchOptions { Filter = filter, Size = 1000 };
+            options.Select.Add("id");
+
+            var results = await _searchClient.SearchAsync<Azure.Search.Documents.Models.SearchDocument>("*", options, ct);
+
+            await foreach (var result in results.Value.GetResultsAsync())
+                existing.Add(result.Document["id"]?.ToString() ?? "");
+        }
+
+        return existing;
     }
 }

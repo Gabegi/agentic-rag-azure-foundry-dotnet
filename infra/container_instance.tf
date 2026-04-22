@@ -65,8 +65,8 @@ resource "azurerm_container_group" "invoice_indexer" {
   container {
     name   = "invoice-indexer"
     image  = "${azurerm_container_registry.main.login_server}/invoice-indexer:${var.indexer_image_tag}"
-    cpu    = "1"
-    memory = "2"
+    cpu    = "2"
+    memory = "4"
 
     ports {
       port     = 80

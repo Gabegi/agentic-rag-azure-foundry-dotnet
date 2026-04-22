@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Azure.AI.OpenAI;
 using Azure.Core;
 using Azure.Search.Documents;
@@ -13,6 +14,7 @@ public class EmbeddingService : IEmbeddingService
     private readonly EmbeddingClient _embeddingClient;
     private readonly SearchClient _searchClient;
     private readonly ILogger<EmbeddingService> _logger;
+
     public EmbeddingService(
         IndexerConfig config,
         AzureOpenAIClient openAiClient,
@@ -33,22 +35,21 @@ public class EmbeddingService : IEmbeddingService
         IEnumerable<InvoiceDocument> documents,
         CancellationToken ct = default)
     {
-        _logger.LogInformation("Embedding {Count} documents", documents.Count());
+        var docList = documents.ToList();
+        _logger.LogInformation("Embedding {Count} documents", docList.Count);
 
-        var embedded = new List<InvoiceDocument>();
+        var embedded = new ConcurrentBag<InvoiceDocument>();
 
-        foreach (var document in documents)
-        {
-            _logger.LogInformation("Embedding document {Id}", document.Id);
+        await Parallel.ForEachAsync(docList,
+            new ParallelOptions { MaxDegreeOfParallelism = 10, CancellationToken = ct },
+            async (document, token) =>
+            {
+                var result = await _embeddingClient.GenerateEmbeddingAsync(
+                    document.Content, cancellationToken: token);
 
-            var result = await _embeddingClient.GenerateEmbeddingAsync(
-                document.Content, cancellationToken: ct);
-
-            document.ContentVector = result.Value.ToFloats().ToArray();
-            embedded.Add(document);
-
-            _logger.LogInformation("Embedded document {Id}", document.Id);
-        }
+                document.ContentVector = result.Value.ToFloats().ToArray();
+                embedded.Add(document);
+            });
 
         _logger.LogInformation("Documents embedded — {Count}", embedded.Count);
         return embedded;
@@ -58,23 +59,27 @@ public class EmbeddingService : IEmbeddingService
         IEnumerable<InvoiceDocument> documents,
         CancellationToken ct = default)
     {
-        _logger.LogInformation("Uploading {Count} documents to index", documents.Count());
-
-        var response = await _searchClient.UploadDocumentsAsync(documents, cancellationToken: ct);
+        var docList = documents.ToList();
+        _logger.LogInformation("Uploading {Count} documents to index", docList.Count);
 
         var succeeded = 0;
         var failed    = 0;
 
-        foreach (var result in response.Value.Results)
+        foreach (var batch in docList.Chunk(1000))
         {
-            if (!result.Succeeded)
+            var response = await _searchClient.UploadDocumentsAsync(batch, cancellationToken: ct);
+
+            foreach (var result in response.Value.Results)
             {
-                _logger.LogWarning("Failed to upload document {Key}: {Error}", result.Key, result.ErrorMessage);
-                failed++;
-            }
-            else
-            {
-                succeeded++;
+                if (!result.Succeeded)
+                {
+                    _logger.LogWarning("Failed to upload document {Key}: {Error}", result.Key, result.ErrorMessage);
+                    failed++;
+                }
+                else
+                {
+                    succeeded++;
+                }
             }
         }
 
