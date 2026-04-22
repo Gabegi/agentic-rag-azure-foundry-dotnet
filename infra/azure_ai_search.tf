@@ -24,6 +24,21 @@ resource "azurerm_role_assignment" "sp_search_index_contributor" {
   principal_id         = data.azurerm_client_config.current.object_id
 }
 
+resource "azurerm_monitor_diagnostic_setting" "search" {
+  name                       = "diag-search"
+  target_resource_id         = azurerm_search_service.main.id
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
+
+  enabled_log {
+    category_group = "allLogs"
+  }
+
+  metric {
+    category = "AllMetrics"
+    enabled  = true
+  }
+}
+
 # Allow AI Search to read from blob storage
 resource "azurerm_role_assignment" "search_blob_reader" {
   scope                = azurerm_storage_account.documents.id
