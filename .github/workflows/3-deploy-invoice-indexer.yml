@@ -4,7 +4,6 @@ on:
   workflow_dispatch:
   workflow_run:
     workflows: ["1 - Deploy Infrastructure"]
-
     types:
       - completed
 
@@ -33,8 +32,23 @@ jobs:
             --file src/InvoiceIndexer/Dockerfile \
             src/InvoiceIndexer
 
-      - name: Start indexer
+      - uses: hashicorp/setup-terraform@v2
+
+      - name: Terraform init
+        working-directory: ./infra
+        env:
+          ARM_USE_MSI: true
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        run: terraform init
+
+      - name: Terraform apply with image tag
+        working-directory: ./infra
+        env:
+          ARM_USE_MSI: true
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
         run: |
-          az container start \
-            --resource-group rg-support-agent-dev \
-            --name aci-invoice-indexer-dev
+          terraform apply -auto-approve \
+            -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
+            -var="indexer_image_tag=${{ github.sha }}"
