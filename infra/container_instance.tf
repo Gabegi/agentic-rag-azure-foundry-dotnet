@@ -64,7 +64,7 @@ resource "azurerm_container_group" "invoice_indexer" {
 
   container {
     name   = "invoice-indexer"
-    image  = "mcr.microsoft.com/azuredocs/aci-helloworld"
+    image  = "${azurerm_container_registry.main.login_server}/invoice-indexer:${var.indexer_image_tag}"
     cpu    = "1"
     memory = "2"
 
@@ -94,10 +94,6 @@ resource "azurerm_container_group" "invoice_indexer" {
       workspace_id  = azurerm_log_analytics_workspace.main.workspace_id
       workspace_key = azurerm_log_analytics_workspace.main.primary_shared_key
     }
-  }
-
-  lifecycle {
-    ignore_changes = [container[0].image]
   }
 
   tags = {
