@@ -24,7 +24,7 @@ resource "azurerm_monitor_scheduled_query_rules_alert_v2" "throttling" {
     query = <<-QUERY
       AzureDiagnostics
       | where ResourceProvider == "MICROSOFT.SEARCH"
-      | where toint(resultSignature_d) == 503
+      | where resultSignature_s == "503"
       | summarize ThrottledRequests = count()
     QUERY
 
@@ -101,12 +101,12 @@ resource "azurerm_monitor_scheduled_query_rules_alert_v2" "indexing_impact" {
         | where ResourceProvider == "MICROSOFT.SEARCH"
         | where OperationName startswith "Indexing"
         | summarize IndexingCount = count() by bin(TimeGenerated, 1m);
-      let queries = AzureDiagnostics
+      let searchOps = AzureDiagnostics
         | where ResourceProvider == "MICROSOFT.SEARCH"
         | where OperationName == "Query.Search"
         | summarize AvgLatencyMs = avg(DurationMs) by bin(TimeGenerated, 1m);
       indexing
-      | join kind=inner queries on TimeGenerated
+      | join kind=inner searchOps on TimeGenerated
       | where AvgLatencyMs > 2000 and IndexingCount > 0
       | summarize Count = count()
     QUERY

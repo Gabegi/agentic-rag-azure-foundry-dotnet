@@ -43,7 +43,7 @@ resource "azurerm_application_insights_workbook" "main" {
           query         = <<-QUERY
             AzureDiagnostics
             | where ResourceProvider == "MICROSOFT.SEARCH"
-            | where toint(resultSignature_d) == 503
+            | where resultSignature_s == "503"
             | summarize ThrottledRequests = count() by bin(TimeGenerated, 5m)
             | render timechart
           QUERY

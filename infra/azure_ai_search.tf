@@ -33,9 +33,8 @@ resource "azurerm_monitor_diagnostic_setting" "search" {
     category_group = "allLogs"
   }
 
-  metric {
+  enabled_metric {
     category = "AllMetrics"
-    enabled  = true
   }
 }
 
