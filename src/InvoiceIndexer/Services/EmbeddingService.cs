@@ -62,14 +62,22 @@ public class EmbeddingService : IEmbeddingService
 
         var response = await _searchClient.UploadDocumentsAsync(documents, cancellationToken: ct);
 
+        var succeeded = 0;
+        var failed    = 0;
+
         foreach (var result in response.Value.Results)
         {
             if (!result.Succeeded)
+            {
                 _logger.LogWarning("Failed to upload document {Key}: {Error}", result.Key, result.ErrorMessage);
+                failed++;
+            }
             else
-                _logger.LogInformation("Uploaded document {Key}", result.Key);
+            {
+                succeeded++;
+            }
         }
 
-        _logger.LogInformation("Upload complete");
+        _logger.LogInformation("Documents uploaded — {Succeeded} succeeded, {Failed} failed", succeeded, failed);
     }
 }
