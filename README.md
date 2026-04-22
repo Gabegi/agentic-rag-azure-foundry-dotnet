@@ -1,105 +1,115 @@
-# Azure AI Foundry Support Agent (RAG)
+# Azure AI Foundry — Invoice Indexer (RAG)
 
-A .NET-based intelligent support agent that combines Retrieval-Augmented Generation (RAG) with Azure OpenAI and Azure AI Search to provide context-aware customer support.
+A .NET batch pipeline that ingests PDF invoices from Azure Blob Storage, extracts structured data via Document Intelligence, generates vector embeddings, and indexes everything into Azure AI Search — ready to be queried via an Azure AI Foundry knowledge base.
 
-## Architecture Overview
-
-```
-User Input → Conversation History → RAG Retrieval → Prompt Construction → GPT-4 → Function Router → Response
-```
-
-## Core Components
-
-### 1. Document Ingestion Service
-Converts FAQ documents into searchable vectors.
+## Architecture
 
 ```
-FAQ docs → Text Chunking (~500 tokens) → Embeddings (text-embedding-ada-002) → Azure AI Search Index
+Azure Blob Storage (PDFs)
+        │
+        ▼
+Document Intelligence      ← extracts vendor, amount, date, category...
+        │
+        ▼
+Azure OpenAI Embeddings    ← text-embedding-3-large
+        │
+        ▼
+Azure AI Search Index      ← vector + semantic search
+        │
+        ▼
+AI Foundry Knowledge Base  ← query interface for the support agent
 ```
 
-- Reads markdown/text files from `/docs`
-- Generates embeddings via Azure OpenAI
-- Stores vectors + metadata in AI Search index
+## Pipeline Steps
 
-### 2. RAG Retrieval Engine
-Finds relevant documentation for user queries.
+1. **EnsureIndex** — creates or updates the AI Search index with vector and semantic config
+2. **ReadBlobs** — lists all PDFs from the blob container
+3. **ExtractDocuments** — runs each PDF through Document Intelligence (`prebuilt-invoice`)
+4. **EmbedDocuments** — generates 3072-dimension vectors via `text-embedding-3-large`
+5. **UploadDocuments** — uploads documents + vectors to AI Search
+6. **EnsureKnowledgeSource** — creates an AI Search knowledge source in AI Foundry
+7. **EnsureKnowledgeBase** — creates a knowledge base backed by the index
 
+## Azure Services
+
+| Service | Purpose |
+|---|---|
+| Azure Blob Storage | Stores source PDF invoices |
+| Azure Document Intelligence | Extracts structured fields from PDFs |
+| Azure OpenAI | Generates embeddings + powers the knowledge base |
+| Azure AI Search | Hosts the vector + semantic index |
+| Azure Container Instance | Runs the indexer as a batch job |
+| Azure Container Registry | Stores the Docker image |
+
+## Getting Started
+
+### Prerequisites
+
+- Azure CLI (`az login`)
+- Terraform >= 1.0
+- .NET 8 SDK
+- Docker
+
+### 1. Deploy Infrastructure
+
+Set your subscription ID in `infra/terraform.tfvars`:
 ```
-User query → Generate embedding → Vector search → Top 3-5 chunks (similarity > 0.7)
-```
-
-### 3. Agent Orchestrator
-The main brain that coordinates LLM, tools, and context.
-
-**Responsibilities:**
-- Maintain conversation state (last 5-10 messages)
-- Construct system prompts with RAG context
-- Route to functions when needed
-- Generate final responses
-
-### 4. Function/Tool Layer
-Extends agent capabilities beyond Q&A.
-
-| Function | Description |
-|----------|-------------|
-| `CheckOrderStatus(orderId)` | Look up order status from database |
-| `CreateTicket(issue, priority)` | Create a support ticket |
-| `SearchDocs(query)` | Explicit knowledge base search |
-
-## Data Schema
-
-**AI Search Index:**
-```json
-{
-  "id": "doc_001_chunk_01",
-  "content": "Our return policy allows...",
-  "embedding": [0.123, -0.456, ...],
-  "metadata": {
-    "source_file": "return-policy.md",
-    "chunk_index": 1
-  }
-}
+subscription_id = "your-subscription-id"
 ```
 
-## Project Structure
-
-```
-SupportAgent.Core/
-├── Models/
-│   ├── ChatMessage.cs
-│   ├── Order.cs
-│   └── Ticket.cs
-├── Services/
-│   ├── EmbeddingService.cs       # Generate embeddings
-│   ├── SearchService.cs          # Query AI Search
-│   ├── AgentOrchestrator.cs      # Main agent logic
-│   └── FunctionExecutor.cs       # Handle tool calls
-├── Functions/
-│   ├── OrderFunction.cs
-│   └── TicketFunction.cs
-└── Configuration/
-    └── AzureConfig.cs
-
-SupportAgent.Ingest/
-└── Program.cs                     # Index documents
-
-SupportAgent.Console/
-└── Program.cs                     # Chat interface
+Then run the **1 - Deploy Infrastructure** GitHub Actions pipeline, or locally:
+```bash
+cd infra
+terraform init
+terraform apply -var="subscription_id=<your-sub-id>"
 ```
 
-## Example Flow
+### 2. Upload Invoices
 
-**User:** "My order #12345 hasn't shipped yet"
+Place PDFs in the `invoices/` folder and run **2 - Upload Invoices**, or manually upload to the `documents` blob container.
 
-1. Orchestrator receives input
-2. History Manager adds to conversation context
-3. RAG Retrieval finds shipping policy chunks
-4. Prompt Constructor builds context with tools and history
-5. GPT-4 decides to call `CheckOrderStatus("12345")`
-6. Function returns: `{ status: "Shipped", eta: "Jan 26" }`
-7. GPT-4 responds: "Good news! Your order shipped and arrives Jan 26..."
+### 3. Run the Indexer
 
-## Azure Services Required
+Run **3 - Deploy Invoice Indexer** — this builds the Docker image, pushes to ACR, and starts the ACI. The full pipeline runs automatically.
 
-- **Azure OpenAI** - GPT-4 for reasoning, text-embedding-ada-002 for embeddings
-- **Azure AI Search** - Vector store for RAG retrieval
+To re-index, restart the container:
+```bash
+az container start --resource-group rg-support-agent-dev --name aci-invoice-indexer-dev
+```
+
+### 4. Query the Knowledge Base
+
+Open **Azure AI Foundry → Knowledge bases → invoices-knowledge-base → Test** to query indexed invoices directly.
+
+### Local Development
+
+```bash
+# Set environment variables (copy and fill in values)
+cp infra/terraform.tfvars.example infra/terraform.tfvars
+
+# Run locally
+cd src/InvoiceIndexer
+ASPNETCORE_ENVIRONMENT=Development dotnet run
+```
+
+Authenticate with:
+```bash
+az login
+az account set --subscription <your-subscription-id>
+```
+
+## Required Environment Variables
+
+| Variable | Description |
+|---|---|
+| `SEARCH_ENDPOINT` | Azure AI Search endpoint |
+| `OPENAI_ENDPOINT` | Azure OpenAI endpoint |
+| `OPENAI_EMBEDDING_DEPLOYMENT` | Embedding model deployment name |
+| `OPENAI_GPT_DEPLOYMENT` | GPT deployment name |
+| `OPENAI_GPT_MODEL_NAME` | GPT model name (e.g. `gpt-4o`) |
+| `STORAGE_ACCOUNT_URL` | Blob storage account URL |
+| `STORAGE_CONTAINER` | Blob container name |
+| `SEARCH_INDEX_NAME` | AI Search index name |
+| `KNOWLEDGE_SOURCE_NAME` | AI Foundry knowledge source name |
+| `KNOWLEDGE_BASE_NAME` | AI Foundry knowledge base name |
+| `DOCUMENT_INTELLIGENCE_ENDPOINT` | Document Intelligence endpoint |
