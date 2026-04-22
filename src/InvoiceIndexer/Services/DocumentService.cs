@@ -60,11 +60,12 @@ public class DocumentService : IDocumentService
             _logger.LogInformation("Extracting {Name}", blob.Name);
 
             var blobClient = _containerClient.GetBlobClient(blob.Name);
+            var download   = await blobClient.DownloadContentAsync(ct);
 
             var operation = await _diClient.AnalyzeDocumentAsync(
                 WaitUntil.Completed,
                 "prebuilt-invoice",
-                blobClient.Uri,
+                download.Value.Content,
                 cancellationToken: ct);
 
             var invoice = operation.Value.Documents?.FirstOrDefault();
