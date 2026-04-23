@@ -100,57 +100,65 @@ public class DocumentService : IDocumentService
                         return;
                     }
 
-                    // log all invoice-level fields so we can verify what DI actually returns for this dataset
-                    foreach (var field in invoice.Fields)
-                        _logger.LogInformation("DI field: {Key} = {Value}", field.Key,
-                            field.Value.Content ?? field.Value.ValueDouble?.ToString() ?? "null");
+                    // Download blob once — reused for both DI calls (private container, can't pass URI directly)
+                    await using var stream = await blobClient.OpenReadAsync(cancellationToken: token);
+                    var blobContent = await BinaryData.FromStreamAsync(stream, token);
 
-                    var customer = invoice.Fields.TryGetValue("CustomerName",  out var cu) ? cu.Content    : null;
-                    var amount   = invoice.Fields.TryGetValue("InvoiceTotal",  out var a)  ? a.ValueDouble : null;
-                    // date is DateTimeOffset? — null renders as "" in the content string, which is acceptable
-                    var date     = invoice.Fields.TryGetValue("InvoiceDate",   out var dt) ? dt.ValueDate  : null;
-                    var orderId  = invoice.Fields.TryGetValue("PurchaseOrder", out var o)  ? o.Content     : null;
+                    // call 1 — structured fields via prebuilt-invoice
+                    var invoiceOp = await _pipeline.ExecuteAsync(async t =>
+                        await _diClient.AnalyzeDocumentAsync(
+                            WaitUntil.Completed, "prebuilt-invoice", blobContent, cancellationToken: t), token);
 
-                    string? category = null;
-                    double? discount = null;
-
-                    if (invoice.Fields.TryGetValue("Items", out var itemsField) && itemsField.ValueList != null)
+                    var invoice = invoiceOp.Value.Documents?.FirstOrDefault();
+                    if (invoice == null)
                     {
-                        var firstItem = true;
-                        foreach (var item in itemsField.ValueList)
-                        {
-                            // log all available keys on the first item so we can verify what DI actually returns
-                            if (firstItem && item.ValueDictionary != null)
-                            {
-                                _logger.LogInformation("DI item keys for {Name}: {Keys}",
-                                    blob.Name, string.Join(", ", item.ValueDictionary.Keys));
-                                firstItem = false;
-                            }
-
-                            if (category == null && item.ValueDictionary?.TryGetValue("ProductCode", out var code) == true)
-                            {
-                                var productCode = code.Content;
-                                if (productCode != null)
-                                {
-                                    var prefix = productCode.Split('-')[0];
-                                    category = prefix switch
-                                    {
-                                        "FUR" => "Furniture",
-                                        "OFF" => "Office Supplies",
-                                        "TEC" => "Technology",
-                                        _     => productCode
-                                    };
-                                }
-                            }
-
-                            if (discount == null && item.ValueDictionary?.TryGetValue("Discount", out var disc) == true)
-                                discount = disc.ValueDouble;
-                        }
+                        _logger.LogWarning("No invoice found in {Name}", blob.Name);
+                        return;
                     }
 
-                    var content = $"Invoice for {customer} dated {date:yyyy-MM-dd}. " +
-                                  $"Category: {category}. Amount: ${amount}. "        +
-                                  $"Discount: {discount}%. Order ID: {orderId}.";
+                    // call 2 — full text via prebuilt-read for category + discount regex
+                    var readOp = await _pipeline.ExecuteAsync(async t =>
+                        await _diClient.AnalyzeDocumentAsync(
+                            WaitUntil.Completed, "prebuilt-read", blobContent, cancellationToken: t), token);
+
+                    var fullText = string.Join("\n", readOp.Value.Pages
+                        .SelectMany(p => p.Lines)
+                        .Select(l => l.Content));
+
+                    // structured fields
+                    var customer = invoice.Fields.TryGetValue("BillingAddressRecipient", out var cu) ? cu.Content : null;
+                    // date is DateTimeOffset? — null renders as "" in the content string, which is acceptable
+                    var date    = invoice.Fields.TryGetValue("InvoiceDate",   out var dt) ? dt.ValueDate : null;
+                    var orderId = invoice.Fields.TryGetValue("PurchaseOrder", out var o)  ? o.Content    : null;
+
+                    double? amount = null;
+                    if (invoice.Fields.TryGetValue("InvoiceTotal", out var a) && a.Content != null)
+                    {
+                        var cleaned = a.Content.Replace("$", "").Replace(",", "").Trim();
+                        if (double.TryParse(cleaned, System.Globalization.NumberStyles.Any,
+                                System.Globalization.CultureInfo.InvariantCulture, out var parsed))
+                            amount = parsed;
+                    }
+
+                    // category + discount from full text
+                    double? discount = null;
+                    var discountMatch = Regex.Match(fullText, @"Discount\s*\((\d+)%\)");
+                    if (discountMatch.Success)
+                        discount = double.Parse(discountMatch.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+
+                    string? category = null;
+                    var skuMatch = Regex.Match(fullText, @"([A-Za-z &]+),\s*([A-Za-z &]+),\s*[A-Z]{2,3}-[A-Z]{2,3}-\d+");
+                    if (skuMatch.Success)
+                        category = skuMatch.Groups[2].Value.Trim();
+
+                    // rich content: structured fields + full invoice text for vector search
+                    var content = $"Customer: {customer}\n"    +
+                                  $"Date: {date:yyyy-MM-dd}\n" +
+                                  $"Amount: ${amount}\n"       +
+                                  $"Discount: {discount}%\n"   +
+                                  $"Category: {category}\n"    +
+                                  $"Order ID: {orderId}\n"     +
+                                  $"Full invoice:\n{fullText}";
 
                     documents.Add(new InvoiceDocument
                     {
