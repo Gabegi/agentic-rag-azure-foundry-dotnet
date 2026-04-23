@@ -62,17 +62,14 @@ var host = Host.CreateDefaultBuilder(args)
                 .AddRetry(new RetryStrategyOptions
                 {
                     MaxRetryAttempts = 3,
-                    BackoffType      = DelayBackoffType.Exponential,
                     Delay            = TimeSpan.FromSeconds(2),
-                    UseJitter        = true,
-                    ShouldHandle     = args => args.Outcome.Exception is RequestFailedException { Status: 429 or 503 }
-                                               ? PredicateResult.True()
-                                               : PredicateResult.False()
+                    BackoffType      = DelayBackoffType.Exponential
                 })
                 .AddTimeout(TimeSpan.FromSeconds(30));
         });
         services.AddSingleton(sp =>
-            sp.GetRequiredService<ResiliencePipelineProvider<string>>().GetPipeline("document-intelligence"));
+            sp.GetRequiredService<ResiliencePipelineProvider<string>>()
+              .GetPipeline("document-intelligence"));
 
         // Services
         services.AddSingleton<IIndexService, IndexService>();

@@ -57,7 +57,7 @@ public class DocumentService : IDocumentService
 
         var existingIds = await GetExistingIdsAsync(blobs, ct);
         // Document Intelligence free tier allows 500 transactions total
-        var newBlobs    = blobs.Where(b => !existingIds.Contains(BlobNameToId(b.Name))).Take(500).ToList();
+        var newBlobs = blobs.Where(b => !existingIds.Contains(BlobNameToId(b.Name))).Take(500).ToList();
 
         _logger.LogInformation("Found {Total} PDF blobs — {New} new (capped at 500), {Skipped} already indexed",
             blobs.Count, newBlobs.Count, blobs.Count - newBlobs.Count);
@@ -69,45 +69,36 @@ public class DocumentService : IDocumentService
         IEnumerable<BlobItem> blobs,
         CancellationToken ct = default)
     {
+        _logger.LogInformation("Extracting {Count} documents", blobs.Count());
+
         var documents = new ConcurrentBag<InvoiceDocument>();
 
         await Parallel.ForEachAsync(blobs,
             new ParallelOptions { MaxDegreeOfParallelism = _config.DocumentIntelligenceParallelism, CancellationToken = ct },
             async (blob, token) =>
             {
+                _logger.LogInformation("Extracting {Name}", blob.Name);
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 try
                 {
                     var blobClient = _containerClient.GetBlobClient(blob.Name);
 
-                    // OpenReadAsync streams from blob without buffering the whole file up front
-                    await using var stream     = await blobClient.OpenReadAsync(cancellationToken: token);
-                    var blobContent = await BinaryData.FromStreamAsync(stream, token);
+                    // download once — reused for both DI calls (private container, can't pass URI directly)
+                    BinaryData binaryData;
+                    await using (var stream = await blobClient.OpenReadAsync(cancellationToken: token))
+                        binaryData = await BinaryData.FromStreamAsync(stream, token);
 
-                    var operation = await _pipeline.ExecuteAsync(async t =>
-                        await _diClient.AnalyzeDocumentAsync(
-                            WaitUntil.Completed,
-                            "prebuilt-invoice",
-                            blobContent,
-                            cancellationToken: t),
-                        token);
+                    var docContent = new AnalyzeDocumentContent { Base64Source = binaryData };
 
-                    var invoice = operation.Value.Documents?.FirstOrDefault();
-
-                    if (invoice == null)
-                    {
-                        _logger.LogWarning("No invoice found in {Name}", blob.Name);
-                        return;
-                    }
-
-                    // Download blob once — reused for both DI calls (private container, can't pass URI directly)
-                    await using var stream = await blobClient.OpenReadAsync(cancellationToken: token);
-                    var blobContent = await BinaryData.FromStreamAsync(stream, token);
-
-                    // call 1 — structured fields via prebuilt-invoice
+                    // call 1 — structured fields
                     var invoiceOp = await _pipeline.ExecuteAsync(async t =>
                         await _diClient.AnalyzeDocumentAsync(
-                            WaitUntil.Completed, "prebuilt-invoice", blobContent, cancellationToken: t), token);
+                            WaitUntil.Completed, "prebuilt-invoice", docContent, cancellationToken: t), token);
+
+                    // call 2 — full text for category + discount regex
+                    var readOp = await _pipeline.ExecuteAsync(async t =>
+                        await _diClient.AnalyzeDocumentAsync(
+                            WaitUntil.Completed, "prebuilt-read", docContent, cancellationToken: t), token);
 
                     var invoice = invoiceOp.Value.Documents?.FirstOrDefault();
                     if (invoice == null)
@@ -116,20 +107,15 @@ public class DocumentService : IDocumentService
                         return;
                     }
 
-                    // call 2 — full text via prebuilt-read for category + discount regex
-                    var readOp = await _pipeline.ExecuteAsync(async t =>
-                        await _diClient.AnalyzeDocumentAsync(
-                            WaitUntil.Completed, "prebuilt-read", blobContent, cancellationToken: t), token);
-
                     var fullText = string.Join("\n", readOp.Value.Pages
                         .SelectMany(p => p.Lines)
                         .Select(l => l.Content));
 
                     // structured fields
-                    var customer = invoice.Fields.TryGetValue("BillingAddressRecipient", out var cu) ? cu.Content : null;
+                    var customer = invoice.Fields.TryGetValue("BillingAddressRecipient", out var cu) ? cu.Content  : null;
                     // date is DateTimeOffset? — null renders as "" in the content string, which is acceptable
-                    var date    = invoice.Fields.TryGetValue("InvoiceDate",   out var dt) ? dt.ValueDate : null;
-                    var orderId = invoice.Fields.TryGetValue("PurchaseOrder", out var o)  ? o.Content    : null;
+                    var date     = invoice.Fields.TryGetValue("InvoiceDate",             out var dt) ? dt.ValueDate : null;
+                    var orderId  = invoice.Fields.TryGetValue("PurchaseOrder",           out var o)  ? o.Content   : null;
 
                     double? amount = null;
                     if (invoice.Fields.TryGetValue("InvoiceTotal", out var a) && a.Content != null)
@@ -140,7 +126,7 @@ public class DocumentService : IDocumentService
                             amount = parsed;
                     }
 
-                    // category + discount from full text
+                    // category + discount extracted from full text via regex
                     double? discount = null;
                     var discountMatch = Regex.Match(fullText, @"Discount\s*\((\d+)%\)");
                     if (discountMatch.Success)
@@ -174,7 +160,7 @@ public class DocumentService : IDocumentService
                         Content    = content
                     });
 
-                    _logger.LogInformation("Processed {Name} in {Ms}ms", blob.Name, sw.ElapsedMilliseconds);
+                    _logger.LogInformation("Extracted {Name} in {Ms}ms", blob.Name, sw.ElapsedMilliseconds);
                 }
                 catch (Exception ex)
                 {
