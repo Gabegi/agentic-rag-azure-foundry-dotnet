@@ -99,35 +99,43 @@ public class DocumentService : IDocumentService
                         return;
                     }
 
-                    var customer = invoice.Fields.TryGetValue("CustomerName",    out var cu) ? cu.Content    : null;
-                    var amount   = invoice.Fields.TryGetValue("InvoiceTotal",    out var a)  ? a.ValueDouble : null;
+                    var customer = invoice.Fields.TryGetValue("CustomerName", out var cu) ? cu.Content    : null;
+                    var amount   = invoice.Fields.TryGetValue("InvoiceTotal", out var a)  ? a.ValueDouble : null;
                     // date is DateTimeOffset? — null renders as "" in the content string, which is acceptable
-                    var date     = invoice.Fields.TryGetValue("InvoiceDate",     out var dt) ? dt.ValueDate  : null;
-                    var orderId  = invoice.Fields.TryGetValue("PurchaseOrder",   out var o)  ? o.Content     : null;
-                    var shipMode = invoice.Fields.TryGetValue("ShippingDetails", out var s)  ? s.Content     : null;
+                    var date     = invoice.Fields.TryGetValue("InvoiceDate",  out var dt) ? dt.ValueDate  : null;
+                    var orderId  = invoice.Fields.TryGetValue("PurchaseOrder", out var o) ? o.Content     : null;
 
-                    // discount is inline in item lines — extract first percentage found
-                    invoice.Fields.TryGetValue("Items", out var itemsField);
-                    var itemsText = itemsField?.Content;
-                    double? discount = null;
-                    if (itemsText != null)
-                    {
-                        var match = System.Text.RegularExpressions.Regex.Match(itemsText, @"(\d+(?:\.\d+)?)%");
-                        if (match.Success) discount = double.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
-                    }
-
-                    // category is the second comma-separated part of the item description e.g. "Chairs, Furniture, FUR-CH-4421"
                     string? category = null;
-                    if (itemsText != null)
+                    double? discount = null;
+
+                    if (invoice.Fields.TryGetValue("Items", out var itemsField) && itemsField.ValueArray != null)
                     {
-                        var parts = itemsText.Split(',');
-                        if (parts.Length >= 2) category = parts[1].Trim();
+                        var firstItem = true;
+                        foreach (var item in itemsField.ValueArray)
+                        {
+                            // log all available keys on the first item so we can verify what DI actually returns
+                            if (firstItem && item.ValueObject != null)
+                            {
+                                _logger.LogInformation("DI item keys for {Name}: {Keys}",
+                                    blob.Name, string.Join(", ", item.ValueObject.Keys));
+                                firstItem = false;
+                            }
+
+                            if (category == null && item.ValueObject?.TryGetValue("Description", out var desc) == true)
+                            {
+                                // "Chairs, Furniture, FUR-CH-4421" — category is parts[1]
+                                var parts = desc.Content?.Split(',');
+                                if (parts?.Length >= 2) category = parts[1].Trim();
+                            }
+
+                            if (discount == null && item.ValueObject?.TryGetValue("Discount", out var disc) == true)
+                                discount = disc.ValueDouble;
+                        }
                     }
 
-                    var content = $"Invoice for {customer} dated {date:yyyy-MM-dd}. "  +
-                                  $"Category: {category}. Amount: ${amount}. "         +
-                                  $"Discount: {discount}%. Ship mode: {shipMode}. "    +
-                                  $"Order ID: {orderId}.";
+                    var content = $"Invoice for {customer} dated {date:yyyy-MM-dd}. " +
+                                  $"Category: {category}. Amount: ${amount}. "        +
+                                  $"Discount: {discount}%. Order ID: {orderId}.";
 
                     documents.Add(new InvoiceDocument
                     {
@@ -139,7 +147,6 @@ public class DocumentService : IDocumentService
                         Discount   = discount,
                         Category   = category,
                         Date       = date,
-                        ShipMode   = shipMode,
                         OrderId    = orderId,
                         Content    = content
                     });
