@@ -53,6 +53,7 @@ public class KnowledgeService : IKnowledgeService
                     new SearchIndexFieldReference("order_id"),
                     new SearchIndexFieldReference("content")
                 }
+                // note: content_vector is excluded — it's hidden/not stored and not needed for LLM context
             }
         )
         {

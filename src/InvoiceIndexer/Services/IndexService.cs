@@ -54,16 +54,16 @@ public class IndexService : IIndexService
             SemanticSearch = semanticSearch,
             Fields =
             {
-                new SimpleField("id", SearchFieldDataType.String)           { IsKey = true, IsFilterable = true },
-                new SearchableField("customer")                             { IsFilterable = true, IsFacetable = true },
-                new SimpleField("amount",   SearchFieldDataType.Double)     { IsFilterable = true, IsSortable = true },
-                new SimpleField("discount", SearchFieldDataType.Double)     { IsFilterable = true, IsSortable = true },
-                new SearchableField("category")                             { IsFilterable = true, IsFacetable = true },
-                new SimpleField("date", SearchFieldDataType.DateTimeOffset) { IsFilterable = true, IsSortable = true },
-                new SimpleField("order_id", SearchFieldDataType.String)     { IsFilterable = true },
-                new SimpleField("source_file", SearchFieldDataType.String)  { IsFilterable = true },
-                new SearchableField("content")                              { AnalyzerName = "en.microsoft" },
-                new VectorSearchField("content_vector", 3072, "vector-profile") { IsHidden = true, IsStored = false }
+                new SimpleField("id",       SearchFieldDataType.String)           { IsKey = true, IsFilterable = true },
+                new SearchableField("customer")                                   { IsFilterable = true, IsFacetable = true },
+                new SimpleField("amount",   SearchFieldDataType.Double)           { IsFilterable = true, IsSortable = true },
+                new SimpleField("discount", SearchFieldDataType.Double)           { IsFilterable = true, IsSortable = true },
+                new SearchableField("category")                                   { IsFilterable = true, IsFacetable = true },
+                new SimpleField("date",     SearchFieldDataType.DateTimeOffset)   { IsFilterable = true, IsSortable = true },
+                new SimpleField("order_id", SearchFieldDataType.String)           { IsFilterable = true },
+                new SimpleField("source_file", SearchFieldDataType.String)        { IsFilterable = true },
+                new SearchableField("content")                                    { AnalyzerName = "en.microsoft" },
+                new VectorSearchField("content_vector", 3072, "vector-profile")  { IsHidden = true, IsStored = false }
             }
         };
 
