@@ -8,7 +8,6 @@ using Azure.Core;
 using InvoiceIndexer.Configuration;
 using InvoiceIndexer.Models;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Resilience;
 using Polly;
 
 namespace InvoiceIndexer.Services;
@@ -27,13 +26,13 @@ public class DocumentService : IDocumentService
         BlobServiceClient blobServiceClient,
         DocumentIntelligenceClient diClient,
         TokenCredential credential,
-        ResiliencePipelineProvider<string> pipelineProvider,
+        ResiliencePipeline pipeline,
         ILogger<DocumentService> logger)
     {
         _containerClient = blobServiceClient.GetBlobContainerClient(config.StorageContainer);
         _diClient        = diClient;
         _searchClient    = new SearchClient(new Uri(config.SearchEndpoint), config.SearchIndexName, credential);
-        _pipeline        = pipelineProvider.GetPipeline("document-intelligence");
+        _pipeline        = pipeline;
         _config          = config;
         _logger          = logger;
     }
@@ -80,14 +79,15 @@ public class DocumentService : IDocumentService
                 {
                     var blobClient = _containerClient.GetBlobClient(blob.Name);
 
-                    // Stream the blob rather than loading it fully into memory — avoids spikes with concurrent large PDFs
-                    var stream = await blobClient.OpenReadAsync(cancellationToken: token);
+                    // OpenReadAsync streams from blob without buffering the whole file up front
+                    await using var stream     = await blobClient.OpenReadAsync(cancellationToken: token);
+                    var blobContent = await BinaryData.FromStreamAsync(stream, token);
 
                     var operation = await _pipeline.ExecuteAsync(async t =>
                         await _diClient.AnalyzeDocumentAsync(
                             WaitUntil.Completed,
                             "prebuilt-invoice",
-                            stream,
+                            blobContent,
                             cancellationToken: t),
                         token);
 

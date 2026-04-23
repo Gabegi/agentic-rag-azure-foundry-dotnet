@@ -52,7 +52,7 @@ var host = Host.CreateDefaultBuilder(args)
         services.AddSingleton(_ =>
             new AzureOpenAIClient(new Uri(config.OpenAiEndpoint), credential));
 
-        // Resilience
+        // Resilience — register pipeline via Microsoft.Extensions.Resilience, then expose it as a typed singleton
         services.AddResiliencePipeline("document-intelligence", builder =>
         {
             builder
@@ -68,6 +68,8 @@ var host = Host.CreateDefaultBuilder(args)
                 })
                 .AddTimeout(TimeSpan.FromSeconds(30));
         });
+        services.AddSingleton(sp =>
+            sp.GetRequiredService<ResiliencePipelineProvider<string>>().GetPipeline("document-intelligence"));
 
         // Services
         services.AddSingleton<IIndexService, IndexService>();
