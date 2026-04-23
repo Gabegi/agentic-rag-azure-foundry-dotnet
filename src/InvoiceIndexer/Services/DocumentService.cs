@@ -49,9 +49,10 @@ public class DocumentService : IDocumentService
         }
 
         var existingIds = await GetExistingIdsAsync(blobs, ct);
-        var newBlobs    = blobs.Where(b => !existingIds.Contains(BlobNameToId(b.Name))).ToList();
+        // Document Intelligence free tier allows 500 transactions total
+        var newBlobs    = blobs.Where(b => !existingIds.Contains(BlobNameToId(b.Name))).Take(500).ToList();
 
-        _logger.LogInformation("Found {Total} PDF blobs — {New} new, {Skipped} already indexed",
+        _logger.LogInformation("Found {Total} PDF blobs — {New} new (capped at 500), {Skipped} already indexed",
             blobs.Count, newBlobs.Count, blobs.Count - newBlobs.Count);
 
         return newBlobs;
