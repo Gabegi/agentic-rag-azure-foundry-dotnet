@@ -99,11 +99,16 @@ public class DocumentService : IDocumentService
                         return;
                     }
 
-                    var customer = invoice.Fields.TryGetValue("CustomerName", out var cu) ? cu.Content    : null;
-                    var amount   = invoice.Fields.TryGetValue("InvoiceTotal", out var a)  ? a.ValueDouble : null;
+                    // log all invoice-level fields so we can verify what DI actually returns for this dataset
+                    foreach (var field in invoice.Fields)
+                        _logger.LogInformation("DI field: {Key} = {Value}", field.Key,
+                            field.Value.Content ?? field.Value.ValueDouble?.ToString() ?? "null");
+
+                    var customer = invoice.Fields.TryGetValue("CustomerName",  out var cu) ? cu.Content    : null;
+                    var amount   = invoice.Fields.TryGetValue("InvoiceTotal",  out var a)  ? a.ValueDouble : null;
                     // date is DateTimeOffset? — null renders as "" in the content string, which is acceptable
-                    var date     = invoice.Fields.TryGetValue("InvoiceDate",  out var dt) ? dt.ValueDate  : null;
-                    var orderId  = invoice.Fields.TryGetValue("PurchaseOrder", out var o) ? o.Content     : null;
+                    var date     = invoice.Fields.TryGetValue("InvoiceDate",   out var dt) ? dt.ValueDate  : null;
+                    var orderId  = invoice.Fields.TryGetValue("PurchaseOrder", out var o)  ? o.Content     : null;
 
                     string? category = null;
                     double? discount = null;
@@ -121,11 +126,20 @@ public class DocumentService : IDocumentService
                                 firstItem = false;
                             }
 
-                            if (category == null && item.ValueDictionary?.TryGetValue("Description", out var desc) == true)
+                            if (category == null && item.ValueDictionary?.TryGetValue("ProductCode", out var code) == true)
                             {
-                                // "Chairs, Furniture, FUR-CH-4421" — category is parts[1]
-                                var parts = desc.Content?.Split(',');
-                                if (parts?.Length >= 2) category = parts[1].Trim();
+                                var productCode = code.Content;
+                                if (productCode != null)
+                                {
+                                    var prefix = productCode.Split('-')[0];
+                                    category = prefix switch
+                                    {
+                                        "FUR" => "Furniture",
+                                        "OFF" => "Office Supplies",
+                                        "TEC" => "Technology",
+                                        _     => productCode
+                                    };
+                                }
                             }
 
                             if (discount == null && item.ValueDictionary?.TryGetValue("Discount", out var disc) == true)
