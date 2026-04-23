@@ -99,30 +99,49 @@ public class DocumentService : IDocumentService
                         return;
                     }
 
-                    var vendor       = invoice.Fields.TryGetValue("VendorName",    out var v)  ? v.Content     : null;
-                    var amount       = invoice.Fields.TryGetValue("InvoiceTotal",  out var a)  ? a.ValueDouble : null;
-                    var discount     = invoice.Fields.TryGetValue("TotalDiscount", out var d)  ? d.ValueDouble : null;
-                    var category     = invoice.Fields.TryGetValue("PurchaseOrder", out var c)  ? c.Content     : null;
+                    var customer = invoice.Fields.TryGetValue("CustomerName",    out var cu) ? cu.Content    : null;
+                    var amount   = invoice.Fields.TryGetValue("InvoiceTotal",    out var a)  ? a.ValueDouble : null;
                     // date is DateTimeOffset? — null renders as "" in the content string, which is acceptable
-                    var date         = invoice.Fields.TryGetValue("InvoiceDate",   out var dt) ? dt.ValueDate  : null;
-                    var paymentTerms = invoice.Fields.TryGetValue("PaymentTerm",   out var p)  ? p.Content     : null;
+                    var date     = invoice.Fields.TryGetValue("InvoiceDate",     out var dt) ? dt.ValueDate  : null;
+                    var orderId  = invoice.Fields.TryGetValue("PurchaseOrder",   out var o)  ? o.Content     : null;
+                    var shipMode = invoice.Fields.TryGetValue("ShippingDetails", out var s)  ? s.Content     : null;
 
-                    var content = $"Invoice from {vendor} dated {date:yyyy-MM-dd}. " +
-                                  $"Category: {category}. Amount: ${amount}. "       +
-                                  $"Discount: {discount}%. Payment terms: {paymentTerms}.";
+                    // discount is inline in item lines — extract first percentage found
+                    invoice.Fields.TryGetValue("Items", out var itemsField);
+                    var itemsText = itemsField?.Content;
+                    double? discount = null;
+                    if (itemsText != null)
+                    {
+                        var match = System.Text.RegularExpressions.Regex.Match(itemsText, @"(\d+(?:\.\d+)?)%");
+                        if (match.Success) discount = double.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+                    }
+
+                    // category is the second comma-separated part of the item description e.g. "Chairs, Furniture, FUR-CH-4421"
+                    string? category = null;
+                    if (itemsText != null)
+                    {
+                        var parts = itemsText.Split(',');
+                        if (parts.Length >= 2) category = parts[1].Trim();
+                    }
+
+                    var content = $"Invoice for {customer} dated {date:yyyy-MM-dd}. "  +
+                                  $"Category: {category}. Amount: ${amount}. "         +
+                                  $"Discount: {discount}%. Ship mode: {shipMode}. "    +
+                                  $"Order ID: {orderId}.";
 
                     documents.Add(new InvoiceDocument
                     {
                         // Azure AI Search keys only allow letters, digits, _ - = — Base64 encode to handle spaces and + in blob names
-                        Id           = BlobNameToId(blob.Name),
-                        SourceFile   = blob.Name,
-                        Vendor       = vendor,
-                        Amount       = amount,
-                        Discount     = discount,
-                        Category     = category,
-                        Date         = date,
-                        PaymentTerms = paymentTerms,
-                        Content      = content
+                        Id         = BlobNameToId(blob.Name),
+                        SourceFile = blob.Name,
+                        Customer   = customer,
+                        Amount     = amount,
+                        Discount   = discount,
+                        Category   = category,
+                        Date       = date,
+                        ShipMode   = shipMode,
+                        OrderId    = orderId,
+                        Content    = content
                     });
 
                     _logger.LogInformation("Processed {Name} in {Ms}ms", blob.Name, sw.ElapsedMilliseconds);

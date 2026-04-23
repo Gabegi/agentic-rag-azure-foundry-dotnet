@@ -7,8 +7,8 @@ public class InvoiceDocument
     [JsonPropertyName("id")]
     public string? Id { get; set; }
 
-    [JsonPropertyName("vendor")]
-    public string? Vendor { get; set; }
+    [JsonPropertyName("customer")]
+    public string? Customer { get; set; }
 
     [JsonPropertyName("amount")]
     public double? Amount { get; set; }
@@ -22,8 +22,11 @@ public class InvoiceDocument
     [JsonPropertyName("date")]
     public DateTimeOffset? Date { get; set; }
 
-    [JsonPropertyName("payment_terms")]
-    public string? PaymentTerms { get; set; }
+    [JsonPropertyName("ship_mode")]
+    public string? ShipMode { get; set; }
+
+    [JsonPropertyName("order_id")]
+    public string? OrderId { get; set; }
 
     [JsonPropertyName("source_file")]
     public string? SourceFile { get; set; }

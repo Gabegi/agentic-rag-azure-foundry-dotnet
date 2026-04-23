@@ -37,7 +37,7 @@ public class KnowledgeService : IKnowledgeService
                 SearchFields =
                 {
                     new SearchIndexFieldReference("content"),
-                    new SearchIndexFieldReference("vendor"),
+                    new SearchIndexFieldReference("customer"),
                     new SearchIndexFieldReference("category")
                 },
                 // All structured fields returned so the model has full invoice context
@@ -45,12 +45,13 @@ public class KnowledgeService : IKnowledgeService
                 {
                     new SearchIndexFieldReference("id"),
                     new SearchIndexFieldReference("source_file"),
-                    new SearchIndexFieldReference("vendor"),
+                    new SearchIndexFieldReference("customer"),
                     new SearchIndexFieldReference("category"),
                     new SearchIndexFieldReference("amount"),
                     new SearchIndexFieldReference("discount"),
                     new SearchIndexFieldReference("date"),
-                    new SearchIndexFieldReference("payment_terms"),
+                    new SearchIndexFieldReference("ship_mode"),
+                    new SearchIndexFieldReference("order_id"),
                     new SearchIndexFieldReference("content")
                 }
             }
