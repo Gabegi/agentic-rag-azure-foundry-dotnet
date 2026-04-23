@@ -8,6 +8,8 @@ using Azure.Core;
 using InvoiceIndexer.Configuration;
 using InvoiceIndexer.Models;
 using Microsoft.Extensions.Logging;
+using Polly;
+using Polly.Retry;
 
 namespace InvoiceIndexer.Services;
 
@@ -16,7 +18,19 @@ public class DocumentService : IDocumentService
     private readonly BlobContainerClient _containerClient;
     private readonly DocumentIntelligenceClient _diClient;
     private readonly SearchClient _searchClient;
+    private readonly IndexerConfig _config;
     private readonly ILogger<DocumentService> _logger;
+
+    // Retry up to 3 times on 429 throttling, with exponential back-off starting at 2 s
+    private static readonly ResiliencePipeline _retryPipeline = new ResiliencePipelineBuilder()
+        .AddRetry(new RetryStrategyOptions
+        {
+            ShouldHandle      = new PredicateBuilder().Handle<RequestFailedException>(e => e.Status == 429),
+            MaxRetryAttempts  = 3,
+            DelayGenerator    = static args =>
+                ValueTask.FromResult<TimeSpan?>(TimeSpan.FromSeconds(Math.Pow(2, args.AttemptNumber)))
+        })
+        .Build();
 
     public DocumentService(
         IndexerConfig config,
@@ -28,6 +42,7 @@ public class DocumentService : IDocumentService
         _containerClient = blobServiceClient.GetBlobContainerClient(config.StorageContainer);
         _diClient        = diClient;
         _searchClient    = new SearchClient(new Uri(config.SearchEndpoint), config.SearchIndexName, credential);
+        _config          = config;
         _logger          = logger;
     }
 
