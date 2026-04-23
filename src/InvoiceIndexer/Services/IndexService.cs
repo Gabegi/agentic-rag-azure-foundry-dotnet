@@ -60,7 +60,6 @@ public class IndexService : IIndexService
                 new SimpleField("discount", SearchFieldDataType.Double)     { IsFilterable = true, IsSortable = true },
                 new SearchableField("category")                             { IsFilterable = true, IsFacetable = true },
                 new SimpleField("date", SearchFieldDataType.DateTimeOffset) { IsFilterable = true, IsSortable = true },
-                new SearchableField("ship_mode")                            { IsFilterable = true },
                 new SimpleField("order_id", SearchFieldDataType.String)     { IsFilterable = true },
                 new SimpleField("source_file", SearchFieldDataType.String)  { IsFilterable = true },
                 new SearchableField("content")                              { AnalyzerName = "en.microsoft" },

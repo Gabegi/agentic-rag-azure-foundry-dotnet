@@ -50,7 +50,6 @@ public class KnowledgeService : IKnowledgeService
                     new SearchIndexFieldReference("amount"),
                     new SearchIndexFieldReference("discount"),
                     new SearchIndexFieldReference("date"),
-                    new SearchIndexFieldReference("ship_mode"),
                     new SearchIndexFieldReference("order_id"),
                     new SearchIndexFieldReference("content")
                 }
