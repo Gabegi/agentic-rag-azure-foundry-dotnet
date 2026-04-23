@@ -22,9 +22,6 @@ public class InvoiceDocument
     [JsonPropertyName("date")]
     public DateTimeOffset? Date { get; set; }
 
-    [JsonPropertyName("ship_mode")]
-    public string? ShipMode { get; set; }
-
     [JsonPropertyName("order_id")]
     public string? OrderId { get; set; }
 
