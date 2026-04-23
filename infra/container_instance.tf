@@ -109,4 +109,9 @@ resource "azurerm_container_group" "invoice_indexer" {
     azurerm_role_assignment.aci_indexer_openai_user,
     azurerm_role_assignment.aci_indexer_di_user,
   ]
+
+  # Prevent infra pipeline from recreating the container — image updates are managed by deploy-invoice-indexer
+  lifecycle {
+    ignore_changes = [container]
+  }
 }
