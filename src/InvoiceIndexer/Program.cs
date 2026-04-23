@@ -8,8 +8,10 @@ using InvoiceIndexer.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Azure;
 using Microsoft.Extensions.Resilience;
 using Polly;
+using Polly.Retry;
 
 var host = Host.CreateDefaultBuilder(args)
     .ConfigureLogging(log =>
