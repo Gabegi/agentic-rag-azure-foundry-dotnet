@@ -12,6 +12,7 @@ using Azure;
 using Microsoft.Extensions.Resilience;
 using Polly;
 using Polly.Retry;
+using Polly.Registry;
 
 var host = Host.CreateDefaultBuilder(args)
     .ConfigureLogging(log =>
