@@ -8,8 +8,8 @@ using Azure.Core;
 using InvoiceIndexer.Configuration;
 using InvoiceIndexer.Models;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Resilience;
 using Polly;
-using Polly.Retry;
 
 namespace InvoiceIndexer.Services;
 
@@ -18,30 +18,22 @@ public class DocumentService : IDocumentService
     private readonly BlobContainerClient _containerClient;
     private readonly DocumentIntelligenceClient _diClient;
     private readonly SearchClient _searchClient;
+    private readonly ResiliencePipeline _pipeline;
     private readonly IndexerConfig _config;
     private readonly ILogger<DocumentService> _logger;
-
-    // Retry up to 3 times on 429 throttling, with exponential back-off starting at 2 s
-    private static readonly ResiliencePipeline _retryPipeline = new ResiliencePipelineBuilder()
-        .AddRetry(new RetryStrategyOptions
-        {
-            ShouldHandle      = new PredicateBuilder().Handle<RequestFailedException>(e => e.Status == 429),
-            MaxRetryAttempts  = 3,
-            DelayGenerator    = static args =>
-                ValueTask.FromResult<TimeSpan?>(TimeSpan.FromSeconds(Math.Pow(2, args.AttemptNumber)))
-        })
-        .Build();
 
     public DocumentService(
         IndexerConfig config,
         BlobServiceClient blobServiceClient,
         DocumentIntelligenceClient diClient,
         TokenCredential credential,
+        ResiliencePipelineProvider<string> pipelineProvider,
         ILogger<DocumentService> logger)
     {
         _containerClient = blobServiceClient.GetBlobContainerClient(config.StorageContainer);
         _diClient        = diClient;
         _searchClient    = new SearchClient(new Uri(config.SearchEndpoint), config.SearchIndexName, credential);
+        _pipeline        = pipelineProvider.GetPipeline("document-intelligence");
         _config          = config;
         _logger          = logger;
     }
@@ -80,20 +72,24 @@ public class DocumentService : IDocumentService
         var documents = new ConcurrentBag<InvoiceDocument>();
 
         await Parallel.ForEachAsync(blobs,
-            new ParallelOptions { MaxDegreeOfParallelism = 10, CancellationToken = ct },
+            new ParallelOptions { MaxDegreeOfParallelism = _config.DocumentIntelligenceParallelism, CancellationToken = ct },
             async (blob, token) =>
             {
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 try
                 {
                     var blobClient = _containerClient.GetBlobClient(blob.Name);
-                    var download   = await blobClient.DownloadContentAsync(token);
 
-                    var operation = await _diClient.AnalyzeDocumentAsync(
-                        WaitUntil.Completed,
-                        "prebuilt-invoice",
-                        download.Value.Content,
-                        cancellationToken: token);
+                    // Stream the blob rather than loading it fully into memory — avoids spikes with concurrent large PDFs
+                    var stream = await blobClient.OpenReadAsync(cancellationToken: token);
+
+                    var operation = await _pipeline.ExecuteAsync(async t =>
+                        await _diClient.AnalyzeDocumentAsync(
+                            WaitUntil.Completed,
+                            "prebuilt-invoice",
+                            stream,
+                            cancellationToken: t),
+                        token);
 
                     var invoice = operation.Value.Documents?.FirstOrDefault();
 
@@ -107,6 +103,7 @@ public class DocumentService : IDocumentService
                     var amount       = invoice.Fields.TryGetValue("InvoiceTotal",  out var a)  ? a.ValueDouble : null;
                     var discount     = invoice.Fields.TryGetValue("TotalDiscount", out var d)  ? d.ValueDouble : null;
                     var category     = invoice.Fields.TryGetValue("PurchaseOrder", out var c)  ? c.Content     : null;
+                    // date is DateTimeOffset? — null renders as "" in the content string, which is acceptable
                     var date         = invoice.Fields.TryGetValue("InvoiceDate",   out var dt) ? dt.ValueDate  : null;
                     var paymentTerms = invoice.Fields.TryGetValue("PaymentTerm",   out var p)  ? p.Content     : null;
 
@@ -146,7 +143,7 @@ public class DocumentService : IDocumentService
 
     private async Task<HashSet<string>> GetExistingIdsAsync(IEnumerable<BlobItem> blobs, CancellationToken ct)
     {
-        var ids     = blobs.Select(b => BlobNameToId(b.Name)).ToList();
+        var ids      = blobs.Select(b => BlobNameToId(b.Name)).ToList();
         var existing = new HashSet<string>();
 
         // Fetch in batches of 1000 (Search $filter length limit)

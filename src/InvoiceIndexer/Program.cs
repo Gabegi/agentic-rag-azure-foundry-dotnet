@@ -8,6 +8,8 @@ using InvoiceIndexer.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Resilience;
+using Polly;
 
 var host = Host.CreateDefaultBuilder(args)
     .ConfigureLogging(log =>
@@ -49,6 +51,23 @@ var host = Host.CreateDefaultBuilder(args)
 
         services.AddSingleton(_ =>
             new AzureOpenAIClient(new Uri(config.OpenAiEndpoint), credential));
+
+        // Resilience
+        services.AddResiliencePipeline("document-intelligence", builder =>
+        {
+            builder
+                .AddRetry(new RetryStrategyOptions
+                {
+                    MaxRetryAttempts = 3,
+                    BackoffType      = DelayBackoffType.Exponential,
+                    Delay            = TimeSpan.FromSeconds(2),
+                    UseJitter        = true,
+                    ShouldHandle     = args => args.Outcome.Exception is RequestFailedException { Status: 429 or 503 }
+                                               ? PredicateResult.True()
+                                               : PredicateResult.False()
+                })
+                .AddTimeout(TimeSpan.FromSeconds(30));
+        });
 
         // Services
         services.AddSingleton<IIndexService, IndexService>();
