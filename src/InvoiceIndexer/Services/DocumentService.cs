@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text.RegularExpressions;
 using Azure;
 using Azure.AI.DocumentIntelligence;
 using Azure.Search.Documents;
