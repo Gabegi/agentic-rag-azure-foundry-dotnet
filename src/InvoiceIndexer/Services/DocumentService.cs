@@ -108,27 +108,27 @@ public class DocumentService : IDocumentService
                     string? category = null;
                     double? discount = null;
 
-                    if (invoice.Fields.TryGetValue("Items", out var itemsField) && itemsField.ValueArray != null)
+                    if (invoice.Fields.TryGetValue("Items", out var itemsField) && itemsField.ValueList != null)
                     {
                         var firstItem = true;
-                        foreach (var item in itemsField.ValueArray)
+                        foreach (var item in itemsField.ValueList)
                         {
                             // log all available keys on the first item so we can verify what DI actually returns
-                            if (firstItem && item.ValueObject != null)
+                            if (firstItem && item.ValueDictionary != null)
                             {
                                 _logger.LogInformation("DI item keys for {Name}: {Keys}",
-                                    blob.Name, string.Join(", ", item.ValueObject.Keys));
+                                    blob.Name, string.Join(", ", item.ValueDictionary.Keys));
                                 firstItem = false;
                             }
 
-                            if (category == null && item.ValueObject?.TryGetValue("Description", out var desc) == true)
+                            if (category == null && item.ValueDictionary?.TryGetValue("Description", out var desc) == true)
                             {
                                 // "Chairs, Furniture, FUR-CH-4421" — category is parts[1]
                                 var parts = desc.Content?.Split(',');
                                 if (parts?.Length >= 2) category = parts[1].Trim();
                             }
 
-                            if (discount == null && item.ValueObject?.TryGetValue("Discount", out var disc) == true)
+                            if (discount == null && item.ValueDictionary?.TryGetValue("Discount", out var disc) == true)
                                 discount = disc.ValueDouble;
                         }
                     }
