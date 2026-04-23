@@ -30,7 +30,8 @@ var host = Host.CreateDefaultBuilder(args)
             SearchIndexName              = ctx.Configuration["SEARCH_INDEX_NAME"]!,
             KnowledgeSourceName          = ctx.Configuration["KNOWLEDGE_SOURCE_NAME"]!,
             KnowledgeBaseName            = ctx.Configuration["KNOWLEDGE_BASE_NAME"]!,
-            DocumentIntelligenceEndpoint = ctx.Configuration["DOCUMENT_INTELLIGENCE_ENDPOINT"]!,
+            DocumentIntelligenceEndpoint    = ctx.Configuration["DOCUMENT_INTELLIGENCE_ENDPOINT"]!,
+            DocumentIntelligenceParallelism = int.TryParse(ctx.Configuration["DI_PARALLELISM"], out var dop) ? dop : 10,
         };
 
         TokenCredential credential = new DefaultAzureCredential();
