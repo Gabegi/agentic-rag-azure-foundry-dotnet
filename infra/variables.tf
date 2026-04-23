@@ -44,3 +44,8 @@ variable "indexer_image_tag" {
   type        = string
   default     = "latest"
 }
+
+variable "admin_object_id" {
+  description = "Object ID of the admin user account for portal access to the search service"
+  type        = string
+}

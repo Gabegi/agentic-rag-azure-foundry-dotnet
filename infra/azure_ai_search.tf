@@ -45,10 +45,10 @@ resource "azurerm_role_assignment" "search_blob_reader" {
   principal_id         = azurerm_search_service.main.identity[0].principal_id
 }
 
-# Allow AI Search to call Azure OpenAI at query time (vectorizer + knowledge base query planning)
+# Cognitive Services User (not OpenAI User) is required for knowledge base query planning via the Foundry resource
 resource "azurerm_role_assignment" "search_openai_user" {
   scope                = azurerm_cognitive_account.openai.id
-  role_definition_name = "Cognitive Services OpenAI User"
+  role_definition_name = "Cognitive Services User"
   principal_id         = azurerm_search_service.main.identity[0].principal_id
 }
 
@@ -57,4 +57,11 @@ resource "azurerm_role_assignment" "search_index_data_reader" {
   scope                = azurerm_search_service.main.id
   role_definition_name = "Search Index Data Reader"
   principal_id         = azurerm_search_service.main.identity[0].principal_id
+}
+
+# Allow admin user to query the search service from the portal (local_authentication_enabled = false forces Entra ID auth)
+resource "azurerm_role_assignment" "admin_search_index_contributor" {
+  scope                = azurerm_search_service.main.id
+  role_definition_name = "Search Index Data Contributor"
+  principal_id         = var.admin_object_id
 }
