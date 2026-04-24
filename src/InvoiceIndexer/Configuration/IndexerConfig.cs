@@ -12,5 +12,5 @@ public class IndexerConfig
     public string KnowledgeBaseName { get; init; } = default!;
     public string OpenAiGptDeployment { get; init; } = default!;
     public string OpenAiGptModelName { get; init; } = default!;
-    public string OpenAiVisionDeployment { get; init; } = "gpt-4o-mini";
+    public string OpenAiVisionDeployment { get; init; } = "gpt-41-extraction";
 }

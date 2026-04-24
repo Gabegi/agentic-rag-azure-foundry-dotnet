@@ -34,12 +34,12 @@ resource "azurerm_cognitive_deployment" "querying" {
 
   model {
     format  = "OpenAI"
-    name    = "gpt-4.1-mini"
+    name    = "gpt-4.1"
     version = "2025-04-14"
   }
 
   sku {
-    name     = "GlobalStandard"
+    name     = "Standard"
     capacity = 10
   }
 }
@@ -50,13 +50,13 @@ resource "azurerm_cognitive_deployment" "extraction" {
 
   model {
     format  = "OpenAI"
-    name    = "gpt-4o-mini"
-    version = "2024-07-18"
+    name    = "gpt-4.1"
+    version = "2025-04-14"
   }
 
   sku {
     name     = "Standard"
-    capacity = 150
+    capacity = 40
   }
 }
 
