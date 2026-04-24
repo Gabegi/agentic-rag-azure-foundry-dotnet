@@ -33,4 +33,7 @@ public class InvoiceDocument
 
     [JsonPropertyName("content_vector")]
     public float[]? ContentVector { get; set; }
+
+    [JsonPropertyName("ship_mode")]
+    public string? ShipMode { get; set; }
 }

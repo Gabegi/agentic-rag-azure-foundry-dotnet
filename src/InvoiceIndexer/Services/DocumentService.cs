@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
-using System.Text.RegularExpressions;
-using Azure;
-using Azure.AI.DocumentIntelligence;
+using System.Text.Json;
+using Azure.AI.OpenAI;
 using Azure.Search.Documents;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
@@ -9,14 +8,16 @@ using Azure.Core;
 using InvoiceIndexer.Configuration;
 using InvoiceIndexer.Models;
 using Microsoft.Extensions.Logging;
+using OpenAI.Chat;
 using Polly;
+using UglyToad.PdfPig;
 
 namespace InvoiceIndexer.Services;
 
 public class DocumentService : IDocumentService
 {
     private readonly BlobContainerClient _containerClient;
-    private readonly DocumentIntelligenceClient _diClient;
+    private readonly ChatClient _chatClient;
     private readonly SearchClient _searchClient;
     private readonly ResiliencePipeline _pipeline;
     private readonly IndexerConfig _config;
@@ -25,13 +26,13 @@ public class DocumentService : IDocumentService
     public DocumentService(
         IndexerConfig config,
         BlobServiceClient blobServiceClient,
-        DocumentIntelligenceClient diClient,
+        AzureOpenAIClient openAiClient,
         TokenCredential credential,
         ResiliencePipeline pipeline,
         ILogger<DocumentService> logger)
     {
         _containerClient = blobServiceClient.GetBlobContainerClient(config.StorageContainer);
-        _diClient        = diClient;
+        _chatClient      = openAiClient.GetChatClient(config.OpenAiGptDeployment);
         _searchClient    = new SearchClient(new Uri(config.SearchEndpoint), config.SearchIndexName, credential);
         _pipeline        = pipeline;
         _config          = config;
@@ -56,7 +57,6 @@ public class DocumentService : IDocumentService
         }
 
         var existingIds = await GetExistingIdsAsync(blobs, ct);
-        // Document Intelligence free tier allows 500 transactions total
         var newBlobs = blobs.Where(b => !existingIds.Contains(BlobNameToId(b.Name))).Take(500).ToList();
 
         _logger.LogInformation("Found {Total} PDF blobs — {New} new (capped at 500), {Skipped} already indexed",
@@ -74,81 +74,84 @@ public class DocumentService : IDocumentService
         var documents = new ConcurrentBag<InvoiceDocument>();
 
         await Parallel.ForEachAsync(blobs,
-            new ParallelOptions { MaxDegreeOfParallelism = _config.DocumentIntelligenceParallelism, CancellationToken = ct },
+            new ParallelOptions { MaxDegreeOfParallelism = 10, CancellationToken = ct },
             async (blob, token) =>
             {
                 _logger.LogInformation("Extracting {Name}", blob.Name);
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 try
                 {
+                    // 1. Download blob
                     var blobClient = _containerClient.GetBlobClient(blob.Name);
-
-                    // download once — reused for both DI calls (private container, can't pass URI directly)
-                    BinaryData binaryData;
+                    byte[] pdfBytes;
                     await using (var stream = await blobClient.OpenReadAsync(cancellationToken: token))
-                        binaryData = await BinaryData.FromStreamAsync(stream, token);
-
-                    var docContent = new AnalyzeDocumentContent { Base64Source = binaryData };
-
-                    // call 1 — structured fields
-                    var invoiceOp = await _pipeline.ExecuteAsync(async t =>
-                        await _diClient.AnalyzeDocumentAsync(
-                            WaitUntil.Completed, "prebuilt-invoice", docContent, cancellationToken: t), token);
-
-                    // call 2 — full text for category + discount regex
-                    var readOp = await _pipeline.ExecuteAsync(async t =>
-                        await _diClient.AnalyzeDocumentAsync(
-                            WaitUntil.Completed, "prebuilt-read", docContent, cancellationToken: t), token);
-
-                    var invoice = invoiceOp.Value.Documents?.FirstOrDefault();
-                    if (invoice == null)
+                    using (var ms = new MemoryStream())
                     {
-                        _logger.LogWarning("No invoice found in {Name}", blob.Name);
-                        return;
+                        await stream.CopyToAsync(ms, token);
+                        pdfBytes = ms.ToArray();
                     }
 
-                    var fullText = string.Join("\n", readOp.Value.Pages
-                        .SelectMany(p => p.Lines)
-                        .Select(l => l.Content));
-
-                    // structured fields
-                    var customer = invoice.Fields.TryGetValue("BillingAddressRecipient", out var cu) ? cu.Content  : null;
-                    // date is DateTimeOffset? — null renders as "" in the content string, which is acceptable
-                    var date     = invoice.Fields.TryGetValue("InvoiceDate",             out var dt) ? dt.ValueDate : null;
-                    var orderId  = invoice.Fields.TryGetValue("PurchaseOrder",           out var o)  ? o.Content   : null;
-
-                    double? amount = null;
-                    if (invoice.Fields.TryGetValue("InvoiceTotal", out var a) && a.Content != null)
+                    // 2. PdfPig — local text extraction (~50ms, free)
+                    string fullText;
+                    using (var pdf = PdfDocument.Open(pdfBytes))
                     {
-                        var cleaned = a.Content.Replace("$", "").Replace(",", "").Trim();
-                        if (double.TryParse(cleaned, System.Globalization.NumberStyles.Any,
-                                System.Globalization.CultureInfo.InvariantCulture, out var parsed))
-                            amount = parsed;
+                        fullText = string.Join("\n",
+                            pdf.GetPages().Select(p =>
+                                string.Join(" ", p.GetWords().Select(w => w.Text))));
                     }
 
-                    // category + discount extracted from full text via regex
-                    double? discount = null;
-                    var discountMatch = Regex.Match(fullText, @"Discount\s*\((\d+)%\)");
-                    if (discountMatch.Success)
-                        discount = double.Parse(discountMatch.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+                    // 3. GPT-4o — structured field extraction from raw text
+                    var prompt = $"Extract fields from this invoice and return JSON only:\n" +
+                     "{\n" +
+                     "  \"customer\": \"full name from Bill To\",\n" +
+                     "  \"amount\": total as number,\n" +
+                     "  \"discount\": discount percentage as number,\n" +
+                     "  \"category\": product category,\n" +
+                     "  \"date\": \"YYYY-MM-DD\",\n" +
+                     "  \"order_id\": \"order ID string\",\n" +
+                     "  \"ship_mode\": \"shipping method\"\n" +
+                     "}\n" +
+                     "Return null for missing fields. JSON only, no explanation.\n\n" +
+                     $"Invoice text:\n{fullText}";
 
-                    string? category = null;
-                    var skuMatch = Regex.Match(fullText, @"([A-Za-z &]+),\s*([A-Za-z &]+),\s*[A-Z]{2,3}-[A-Z]{2,3}-\d+");
-                    if (skuMatch.Success)
-                        category = skuMatch.Groups[2].Value.Trim();
 
-                    // rich content: structured fields + full invoice text for vector search
+                    var response = await _pipeline.ExecuteAsync(async t =>
+                        await _chatClient.CompleteChatAsync(
+                            new ChatMessage[] { new UserChatMessage(prompt) },
+                            cancellationToken: t), token);
+
+                    var json = response.Value.Content[0].Text.Trim();
+
+                    // strip markdown code fences if the model wraps the response
+                    if (json.StartsWith("```"))
+                    {
+                        var firstNewline = json.IndexOf('\n');
+                        var lastFence    = json.LastIndexOf("```");
+                        json = json[(firstNewline + 1)..lastFence].Trim();
+                    }
+
+                    using var jsonDoc = JsonDocument.Parse(json);
+                    var root = jsonDoc.RootElement;
+
+                    var customer = GetString(root, "customer");
+                    var orderId  = GetString(root, "order_id");
+                    var category = GetString(root, "category");
+                    var shipMode = GetString(root, "ship_mode");
+                    var amount   = GetDouble(root, "amount");
+                    var discount = GetDouble(root, "discount");
+                    var date     = GetDate(root, "date");
+
                     var content = $"Customer: {customer}\n"    +
                                   $"Date: {date:yyyy-MM-dd}\n" +
                                   $"Amount: ${amount}\n"       +
                                   $"Discount: {discount}%\n"   +
                                   $"Category: {category}\n"    +
                                   $"Order ID: {orderId}\n"     +
+                                  $"Ship Mode: {shipMode}\n"   +
                                   $"Full invoice:\n{fullText}";
 
                     documents.Add(new InvoiceDocument
                     {
-                        // Azure AI Search keys only allow letters, digits, _ - = — Base64 encode to handle spaces and + in blob names
                         Id         = BlobNameToId(blob.Name),
                         SourceFile = blob.Name,
                         Customer   = customer,
@@ -157,6 +160,7 @@ public class DocumentService : IDocumentService
                         Category   = category,
                         Date       = date,
                         OrderId    = orderId,
+                        ShipMode   = shipMode,
                         Content    = content
                     });
 
@@ -181,7 +185,6 @@ public class DocumentService : IDocumentService
         var ids      = blobs.Select(b => BlobNameToId(b.Name)).ToList();
         var existing = new HashSet<string>();
 
-        // Fetch in batches of 1000 (Search $filter length limit)
         foreach (var batch in ids.Chunk(1000))
         {
             var filter  = string.Join(" or ", batch.Select(id => $"id eq '{id}'"));
@@ -195,5 +198,25 @@ public class DocumentService : IDocumentService
         }
 
         return existing;
+    }
+
+    private static string? GetString(JsonElement root, string key) =>
+        root.TryGetProperty(key, out var el) && el.ValueKind == JsonValueKind.String
+            ? el.GetString()
+            : null;
+
+    private static double? GetDouble(JsonElement root, string key)
+    {
+        if (!root.TryGetProperty(key, out var el)) return null;
+        return el.ValueKind == JsonValueKind.Number ? el.GetDouble() : null;
+    }
+
+    private static DateTimeOffset? GetDate(JsonElement root, string key)
+    {
+        if (!root.TryGetProperty(key, out var el)) return null;
+        if (el.ValueKind == JsonValueKind.String &&
+            DateTimeOffset.TryParse(el.GetString(), out var d))
+            return d;
+        return null;
     }
 }
