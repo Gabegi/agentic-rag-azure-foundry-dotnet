@@ -34,8 +34,8 @@ resource "azurerm_cognitive_deployment" "querying" {
 
   model {
     format  = "OpenAI"
-    name    = "gpt-4o-mini"
-    version = "2024-07-18"
+    name    = "gpt-4.1-mini"
+    version = "2025-04-14"
   }
 
   sku {
@@ -50,8 +50,8 @@ resource "azurerm_cognitive_deployment" "extraction" {
 
   model {
     format  = "OpenAI"
-    name    = "gpt-4o"
-    version = "2024-11-20"
+    name    = "gpt-4.1-nano"
+    version = "2025-04-14"
   }
 
   sku {
