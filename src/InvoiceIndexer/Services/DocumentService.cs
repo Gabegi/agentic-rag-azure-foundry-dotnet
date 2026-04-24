@@ -121,11 +121,16 @@ public class DocumentService : IDocumentService
     }
 
     // Extracts raw text from a PDF using PdfPig — local, fast, no API call.
-    private static string ExtractTextFromPdf(byte[] pdfBytes)
+    private string ExtractTextFromPdf(byte[] pdfBytes)
     {
-        using var pdf = PdfDocument.Open(pdfBytes);
-        return string.Join("\n", pdf.GetPages()
-            .Select(p => string.Join(" ", p.GetWords().Select(w => w.Text))));
+        using var pdf   = PdfDocument.Open(pdfBytes);
+        var pages       = pdf.GetPages().ToList();
+        var text        = string.Join("\n", pages.Select(p => string.Join(" ", p.GetWords().Select(w => w.Text))));
+
+        _logger.LogInformation("PdfPig extracted {Chars} characters from {Pages} pages",
+            text.Length, pages.Count);
+
+        return text;
     }
 
     // Sends raw invoice text to GPT-4o and parses the returned JSON into a JsonElement.
@@ -145,12 +150,17 @@ public class DocumentService : IDocumentService
                      "Return null for missing fields. JSON only, no explanation.\n\n" +
                      $"Invoice text:\n{fullText}";
 
+        _logger.LogInformation("Sending {Chars} characters to GPT-4o for {Name}",
+            fullText.Length, blobName);
+
         var response = await _pipeline.ExecuteAsync(async t =>
             await _chatClient.CompleteChatAsync(
                 new ChatMessage[] { new UserChatMessage(prompt) },
                 cancellationToken: t), ct);
 
         var json = response.Value.Content[0].Text.Trim();
+
+        _logger.LogInformation("GPT-4o response for {Name}: {Json}", blobName, json);
 
         if (json.StartsWith("```"))
         {
@@ -173,7 +183,7 @@ public class DocumentService : IDocumentService
     }
 
     // Maps extracted JSON fields and full text into an InvoiceDocument ready for indexing.
-    private static InvoiceDocument BuildInvoiceDocument(
+    private InvoiceDocument BuildInvoiceDocument(
         string blobName, string fullText, JsonElement fields)
     {
         var customer = GetString(fields, "customer");
@@ -183,6 +193,11 @@ public class DocumentService : IDocumentService
         var amount   = GetDouble(fields, "amount");
         var discount = GetDouble(fields, "discount");
         var date     = GetDate(fields, "date");
+
+        _logger.LogInformation(
+            "Extracted fields for {Name} — customer: {Customer}, amount: {Amount}, " +
+            "discount: {Discount}, category: {Category}, date: {Date}",
+            blobName, customer, amount, discount, category, date);
 
         var content = $"Customer: {customer}\n"    +
                       $"Date: {date:yyyy-MM-dd}\n" +

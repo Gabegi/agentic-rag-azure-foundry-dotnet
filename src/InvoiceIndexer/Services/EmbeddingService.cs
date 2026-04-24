@@ -44,10 +44,17 @@ public class EmbeddingService : IEmbeddingService
             new ParallelOptions { MaxDegreeOfParallelism = 10, CancellationToken = ct },
             async (document, token) =>
             {
+                _logger.LogInformation("Embedding document {Id} — content length: {Chars}",
+                    document.Id, document.Content?.Length);
+
                 var result = await _embeddingClient.GenerateEmbeddingAsync(
                     document.Content, cancellationToken: token);
 
                 document.ContentVector = result.Value.ToFloats().ToArray();
+
+                _logger.LogInformation("Generated vector of {Dims} dimensions for {Id}",
+                    document.ContentVector?.Length, document.Id);
+
                 embedded.Add(document);
             });
 
