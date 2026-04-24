@@ -20,7 +20,6 @@ public class DocumentService : IDocumentService
     private readonly ChatClient _chatClient;
     private readonly SearchClient _searchClient;
     private readonly ResiliencePipeline _pipeline;
-    private readonly IndexerConfig _config;
     private readonly ILogger<DocumentService> _logger;
 
     public DocumentService(
@@ -32,13 +31,13 @@ public class DocumentService : IDocumentService
         ILogger<DocumentService> logger)
     {
         _containerClient = blobServiceClient.GetBlobContainerClient(config.StorageContainer);
-        _chatClient      = openAiClient.GetChatClient(config.OpenAiGptDeployment);
+        _chatClient      = openAiClient.GetChatClient(config.OpenAiVisionDeployment);
         _searchClient    = new SearchClient(new Uri(config.SearchEndpoint), config.SearchIndexName, credential);
         _pipeline        = pipeline;
-        _config          = config;
         _logger          = logger;
     }
 
+    // Lists new PDF blobs from storage, skipping already-indexed ones and capping at 500.
     public async Task<IEnumerable<BlobItem>> ReadBlobsAsync(CancellationToken ct = default)
     {
         _logger.LogInformation("Reading blobs from container {Container}", _containerClient.Name);
@@ -65,6 +64,7 @@ public class DocumentService : IDocumentService
         return newBlobs;
     }
 
+    // Extracts all blobs in parallel, collecting successful results into a bag.
     public async Task<IEnumerable<InvoiceDocument>> ExtractDocumentsAsync(
         IEnumerable<BlobItem> blobs,
         CancellationToken ct = default)
@@ -77,31 +77,62 @@ public class DocumentService : IDocumentService
             new ParallelOptions { MaxDegreeOfParallelism = 10, CancellationToken = ct },
             async (blob, token) =>
             {
-                _logger.LogInformation("Extracting {Name}", blob.Name);
-                var sw = System.Diagnostics.Stopwatch.StartNew();
                 try
                 {
-                    // 1. Download blob
-                    var blobClient = _containerClient.GetBlobClient(blob.Name);
-                    byte[] pdfBytes;
-                    await using (var stream = await blobClient.OpenReadAsync(cancellationToken: token))
-                    using (var ms = new MemoryStream())
-                    {
-                        await stream.CopyToAsync(ms, token);
-                        pdfBytes = ms.ToArray();
-                    }
+                    var document = await ExtractSingleDocumentAsync(blob, token);
+                    if (document != null)
+                        documents.Add(document);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError("Failed to process {Name}: {Error}", blob.Name, ex.Message);
+                }
+            });
 
-                    // 2. PdfPig — local text extraction (~50ms, free)
-                    string fullText;
-                    using (var pdf = PdfDocument.Open(pdfBytes))
-                    {
-                        fullText = string.Join("\n",
-                            pdf.GetPages().Select(p =>
-                                string.Join(" ", p.GetWords().Select(w => w.Text))));
-                    }
+        _logger.LogInformation("Extracted {Count} documents", documents.Count);
+        return documents;
+    }
 
-                    // 3. GPT-4o — structured field extraction from raw text
-                    var prompt = $"Extract fields from this invoice and return JSON only:\n" +
+    // Coordinates the four steps for a single blob: download → text → GPT fields → model.
+    private async Task<InvoiceDocument?> ExtractSingleDocumentAsync(BlobItem blob, CancellationToken ct)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        var pdfBytes = await DownloadBlobAsync(blob, ct);
+        var fullText = ExtractTextFromPdf(pdfBytes);
+        var fields   = await ExtractFieldsWithGptAsync(fullText, blob.Name, ct);
+
+        if (fields == null) return null;
+
+        var document = BuildInvoiceDocument(blob.Name, fullText, fields.Value);
+
+        _logger.LogInformation("Extracted {Name} in {Ms}ms", blob.Name, sw.ElapsedMilliseconds);
+        return document;
+    }
+
+    // Downloads the blob into a byte array; streams to avoid large allocations.
+    private async Task<byte[]> DownloadBlobAsync(BlobItem blob, CancellationToken ct)
+    {
+        var blobClient = _containerClient.GetBlobClient(blob.Name);
+        await using var stream = await blobClient.OpenReadAsync(cancellationToken: ct);
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms, ct);
+        return ms.ToArray();
+    }
+
+    // Extracts raw text from a PDF using PdfPig — local, fast, no API call.
+    private static string ExtractTextFromPdf(byte[] pdfBytes)
+    {
+        using var pdf = PdfDocument.Open(pdfBytes);
+        return string.Join("\n", pdf.GetPages()
+            .Select(p => string.Join(" ", p.GetWords().Select(w => w.Text))));
+    }
+
+    // Sends raw invoice text to GPT-4o and parses the returned JSON into a JsonElement.
+    private async Task<JsonElement?> ExtractFieldsWithGptAsync(
+        string fullText, string blobName, CancellationToken ct)
+    {
+        var prompt = "Extract fields from this invoice and return JSON only:\n" +
                      "{\n" +
                      "  \"customer\": \"full name from Bill To\",\n" +
                      "  \"amount\": total as number,\n" +
@@ -114,78 +145,81 @@ public class DocumentService : IDocumentService
                      "Return null for missing fields. JSON only, no explanation.\n\n" +
                      $"Invoice text:\n{fullText}";
 
+        var response = await _pipeline.ExecuteAsync(async t =>
+            await _chatClient.CompleteChatAsync(
+                new ChatMessage[] { new UserChatMessage(prompt) },
+                cancellationToken: t), ct);
 
-                    var response = await _pipeline.ExecuteAsync(async t =>
-                        await _chatClient.CompleteChatAsync(
-                            new ChatMessage[] { new UserChatMessage(prompt) },
-                            cancellationToken: t), token);
+        var json = response.Value.Content[0].Text.Trim();
 
-                    var json = response.Value.Content[0].Text.Trim();
+        if (json.StartsWith("```"))
+        {
+            var firstNewline = json.IndexOf('\n');
+            var lastFence    = json.LastIndexOf("```");
+            json = json[(firstNewline + 1)..lastFence].Trim();
+        }
 
-                    // strip markdown code fences if the model wraps the response
-                    if (json.StartsWith("```"))
-                    {
-                        var firstNewline = json.IndexOf('\n');
-                        var lastFence    = json.LastIndexOf("```");
-                        json = json[(firstNewline + 1)..lastFence].Trim();
-                    }
-
-                    using var jsonDoc = JsonDocument.Parse(json);
-                    var root = jsonDoc.RootElement;
-
-                    var customer = GetString(root, "customer");
-                    var orderId  = GetString(root, "order_id");
-                    var category = GetString(root, "category");
-                    var shipMode = GetString(root, "ship_mode");
-                    var amount   = GetDouble(root, "amount");
-                    var discount = GetDouble(root, "discount");
-                    var date     = GetDate(root, "date");
-
-                    var content = $"Customer: {customer}\n"    +
-                                  $"Date: {date:yyyy-MM-dd}\n" +
-                                  $"Amount: ${amount}\n"       +
-                                  $"Discount: {discount}%\n"   +
-                                  $"Category: {category}\n"    +
-                                  $"Order ID: {orderId}\n"     +
-                                  $"Ship Mode: {shipMode}\n"   +
-                                  $"Full invoice:\n{fullText}";
-
-                    documents.Add(new InvoiceDocument
-                    {
-                        Id         = BlobNameToId(blob.Name),
-                        SourceFile = blob.Name,
-                        Customer   = customer,
-                        Amount     = amount,
-                        Discount   = discount,
-                        Category   = category,
-                        Date       = date,
-                        OrderId    = orderId,
-                        ShipMode   = shipMode,
-                        Content    = content
-                    });
-
-                    _logger.LogInformation("Extracted {Name} in {Ms}ms", blob.Name, sw.ElapsedMilliseconds);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError("Failed to process {Name}: {Error}", blob.Name, ex.Message);
-                }
-            });
-
-        _logger.LogInformation("Extracted {Count} documents", documents.Count);
-        return documents;
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.Clone();
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogWarning("Failed to parse GPT response for {Name}: {Error}", blobName, ex.Message);
+            _logger.LogDebug("Raw GPT response: {Json}", json);
+            return null;
+        }
     }
 
+    // Maps extracted JSON fields and full text into an InvoiceDocument ready for indexing.
+    private static InvoiceDocument BuildInvoiceDocument(
+        string blobName, string fullText, JsonElement fields)
+    {
+        var customer = GetString(fields, "customer");
+        var orderId  = GetString(fields, "order_id");
+        var category = GetString(fields, "category");
+        var shipMode = GetString(fields, "ship_mode");
+        var amount   = GetDouble(fields, "amount");
+        var discount = GetDouble(fields, "discount");
+        var date     = GetDate(fields, "date");
+
+        var content = $"Customer: {customer}\n"    +
+                      $"Date: {date:yyyy-MM-dd}\n" +
+                      $"Amount: ${amount}\n"       +
+                      $"Discount: {discount}%\n"   +
+                      $"Category: {category}\n"    +
+                      $"Order ID: {orderId}\n"     +
+                      $"Ship Mode: {shipMode}\n"   +
+                      $"Full invoice:\n{fullText}";
+
+        return new InvoiceDocument
+        {
+            Id         = BlobNameToId(blobName),
+            SourceFile = blobName,
+            Customer   = customer,
+            Amount     = amount,
+            Discount   = discount,
+            Category   = category,
+            Date       = date,
+            OrderId    = orderId,
+            ShipMode   = shipMode,
+            Content    = content
+        };
+    }
+
+    // Base64-encodes the blob name so it's safe to use as an Azure AI Search document key.
     private static string BlobNameToId(string blobName) =>
         Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(blobName))
             .Replace("+", "-").Replace("/", "_").Replace("=", "");
 
+    // Queries the search index in batches to find which blob IDs are already indexed.
     private async Task<HashSet<string>> GetExistingIdsAsync(IEnumerable<BlobItem> blobs, CancellationToken ct)
     {
         var ids      = blobs.Select(b => BlobNameToId(b.Name)).ToList();
         var existing = new HashSet<string>();
 
-        foreach (var batch in ids.Chunk(1000))
+        foreach (var batch in ids.Chunk(50))
         {
             var filter  = string.Join(" or ", batch.Select(id => $"id eq '{id}'"));
             var options = new Azure.Search.Documents.SearchOptions { Filter = filter, Size = 1000 };
