@@ -74,7 +74,7 @@ public class DocumentService : IDocumentService
         var documents = new ConcurrentBag<InvoiceDocument>();
 
         await Parallel.ForEachAsync(blobs,
-            new ParallelOptions { MaxDegreeOfParallelism = 10, CancellationToken = ct },
+            new ParallelOptions { MaxDegreeOfParallelism = 4, CancellationToken = ct },
             async (blob, token) =>
             {
                 try

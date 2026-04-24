@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Azure;
+using System.ClientModel;
 using Microsoft.Extensions.Resilience;
 using Polly;
 using Polly.Retry;
@@ -55,11 +56,14 @@ var host = Host.CreateDefaultBuilder(args)
             builder
                 .AddRetry(new RetryStrategyOptions
                 {
-                    MaxRetryAttempts = 3,
-                    Delay            = TimeSpan.FromSeconds(2),
-                    BackoffType      = DelayBackoffType.Exponential
+                    MaxRetryAttempts = 5,
+                    Delay            = TimeSpan.FromSeconds(10),
+                    BackoffType      = DelayBackoffType.Exponential,
+                    ShouldHandle     = new PredicateBuilder()
+                        .Handle<ClientResultException>(e =>
+                            e.Message.Contains("429"))
                 })
-                .AddTimeout(TimeSpan.FromSeconds(30));
+                .AddTimeout(TimeSpan.FromSeconds(60));
         });
         services.AddSingleton(sp =>
             sp.GetRequiredService<ResiliencePipelineProvider<string>>()
