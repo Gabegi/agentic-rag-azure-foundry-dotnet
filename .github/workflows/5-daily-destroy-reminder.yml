@@ -1,0 +1,32 @@
+name: 5 - Daily Destroy Reminder
+
+on:
+  schedule:
+    - cron: "0 17 * * *"  # 5pm UTC daily
+  workflow_dispatch:       # allow manual trigger for testing
+
+jobs:
+  remind:
+    runs-on: [self-hosted]
+    steps:
+      - name: Send destroy reminder email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port: 587
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          to: gabriel.pirastru@devoteam.com
+          from: ${{ secrets.SMTP_USERNAME }}
+          subject: "⚠️ Reminder — destroy dev infrastructure"
+          body: |
+            Hi Gabriel,
+
+            This is your daily reminder to tear down the dev infrastructure and avoid unnecessary costs.
+
+            To destroy:
+            1. Go to Actions → "4 - Destroy Infrastructure"
+            2. Click "Run workflow"
+            3. Type DESTROY in the confirmation field
+
+            Cheers
