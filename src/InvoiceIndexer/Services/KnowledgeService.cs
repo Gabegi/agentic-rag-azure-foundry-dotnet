@@ -73,7 +73,7 @@ public class KnowledgeService : IKnowledgeService
         {
             ResourceUri    = new Uri(_config.OpenAiEndpoint),
             DeploymentName = _config.OpenAiGptDeployment,
-            ModelName      = _config.OpenAiGptModelName
+            ModelName      = _config.OpenAiGptDeployment
         };
 
         var knowledgeBase = new KnowledgeBase(
@@ -81,10 +81,31 @@ public class KnowledgeService : IKnowledgeService
             knowledgeSources: new[] { new KnowledgeSourceReference(_config.KnowledgeSourceName) }
         )
         {
-            Description              = "Knowledge base for invoice retrieval",
-            OutputMode               = KnowledgeRetrievalOutputMode.ExtractiveData,
-            RetrievalReasoningEffort = new KnowledgeRetrievalLowReasoningEffort(),
-            Models                   = { new KnowledgeBaseAzureOpenAIModel(aoaiParams) }
+            // Index description — helps LLM decide whether to query this source
+            Description = "Contains SuperStore invoices with customer names, order amounts, " +
+                          "discounts, product categories, ship modes and order IDs. " +
+                          "Use this index to answer questions about invoice amounts, " +
+                          "customer spending, product categories and order history.",
+
+            // Retrieval instructions — guides query planning and source selection
+            RetrievalInstructions = "When answering questions about totals or aggregates, " +
+                                    "sum the amounts from all matching invoices. " +
+                                    "Always cite the order ID and customer name. " +
+                                    "For discount questions, look for percentage values. " +
+                                    "For category questions, look for product category fields.",
+
+            // Answer instructions — shapes the final response format
+            AnswerInstructions = "Provide a concise answer with specific numbers where available. " +
+                                 "Always list the relevant invoices with customer name, amount and order ID. " +
+                                 "If calculating totals, show the sum clearly.",
+
+            // Answer synthesis — portal returns real answers not raw grounding data
+            OutputMode = KnowledgeRetrievalOutputMode.AnswerSynthesis,
+
+            // Medium reasoning effort — deeper subquery generation for aggregate queries
+            RetrievalReasoningEffort = new KnowledgeRetrievalMediumReasoningEffort(),
+
+            Models = { new KnowledgeBaseAzureOpenAIModel(aoaiParams) }
         };
 
         await _indexClient.CreateOrUpdateKnowledgeBaseAsync(knowledgeBase);

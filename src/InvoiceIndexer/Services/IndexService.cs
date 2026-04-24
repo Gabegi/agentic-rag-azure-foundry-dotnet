@@ -49,7 +49,11 @@ public class IndexService : IIndexService
 
         var index = new SearchIndex(_config.SearchIndexName)
         {
-            Description    = "Invoice index containing vendor, amount, discount, category, date and payment terms from PDF invoices.",
+            // Index description — helps LLM decide whether to query this index
+            Description = "Contains SuperStore invoices with customer names, order amounts, " +
+                          "discounts, product categories, ship modes and order IDs. " +
+                          "Use this index to answer questions about invoice amounts, " +
+                          "customer spending, product categories and order history.",
             VectorSearch   = vectorSearch,
             SemanticSearch = semanticSearch,
             Fields =
