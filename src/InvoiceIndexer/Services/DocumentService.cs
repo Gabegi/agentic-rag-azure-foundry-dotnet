@@ -148,13 +148,14 @@ public class DocumentService : IDocumentService
                      "  \"ship_mode\": \"shipping method\"\n" +
                      "}\n" +
                      "Return null for missing fields. JSON only, no explanation.\n\n" +
-                     $"Invoice text:\n{truncatedText}";
+                     $"Invoice text:\n{extractionText}";
 
-        // invoice fields are always at the top — truncate to reduce tokens
-        var truncatedText = fullText.Length > 1000 ? fullText[..1000] : fullText;
+        // truncate to first 1000 chars for extraction — fields are always at the top
+        // full text is kept separately in content field for semantic search
+        var extractionText = fullText.Length > 1000 ? fullText[..1000] : fullText;
 
         _logger.LogInformation("Sending {Chars} characters to GPT-4o for {Name}",
-            truncatedText.Length, blobName);
+            extractionText.Length, blobName);
 
         var response = await _pipeline.ExecuteAsync(async t =>
             await _chatClient.CompleteChatAsync(
