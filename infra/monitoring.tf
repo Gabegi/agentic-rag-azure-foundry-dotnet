@@ -130,3 +130,95 @@ resource "azurerm_monitor_scheduled_query_rules_alert_v2" "indexing_impact" {
   description = "Fires when indexing activity coincides with high query latency"
   enabled     = true
 }
+
+# Azure OpenAI diagnostic logging — flows GPT-4o and embedding calls into Log Analytics
+resource "azurerm_monitor_diagnostic_setting" "openai" {
+  name                       = "diag-openai"
+  target_resource_id         = azurerm_cognitive_account.openai.id
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
+
+  enabled_log {
+    category_group = "allLogs"
+  }
+
+  enabled_metric {
+    category = "AllMetrics"
+  }
+}
+
+# 4. GPT-4o extraction latency > 10 seconds
+resource "azurerm_monitor_scheduled_query_rules_alert_v2" "gpt_latency" {
+  name                = "alert-openai-gpt-latency-dev"
+  resource_group_name = azurerm_resource_group.main.name
+  location            = azurerm_resource_group.main.location
+
+  evaluation_frequency = "PT5M"
+  window_duration      = "PT5M"
+  scopes               = [azurerm_log_analytics_workspace.main.id]
+  severity             = 2
+
+  criteria {
+    query = <<-QUERY
+      AzureDiagnostics
+      | where ResourceProvider == "MICROSOFT.COGNITIVESERVICES"
+      | where OperationName == "ChatCompletions_Create"
+      | summarize AvgLatencyMs = avg(DurationMs)
+      | where AvgLatencyMs > 10000
+    QUERY
+
+    time_aggregation_method = "Average"
+    threshold               = 10000
+    operator                = "GreaterThan"
+    metric_measure_column   = "AvgLatencyMs"
+
+    failing_periods {
+      minimum_failing_periods_to_trigger_alert = 1
+      number_of_evaluation_periods             = 1
+    }
+  }
+
+  action {
+    action_groups = [azurerm_monitor_action_group.main.id]
+  }
+
+  description = "Fires when GPT-4o extraction calls exceed 10 seconds average"
+  enabled     = true
+}
+
+# 5. OpenAI throttling — fires when any 429 occurs
+resource "azurerm_monitor_scheduled_query_rules_alert_v2" "openai_throttling" {
+  name                = "alert-openai-throttling-dev"
+  resource_group_name = azurerm_resource_group.main.name
+  location            = azurerm_resource_group.main.location
+
+  evaluation_frequency = "PT5M"
+  window_duration      = "PT5M"
+  scopes               = [azurerm_log_analytics_workspace.main.id]
+  severity             = 2
+
+  criteria {
+    query = <<-QUERY
+      AzureDiagnostics
+      | where ResourceProvider == "MICROSOFT.COGNITIVESERVICES"
+      | where toint(resultSignature_d) == 429
+      | summarize ThrottledRequests = count()
+      | where ThrottledRequests > 0
+    QUERY
+
+    time_aggregation_method = "Count"
+    threshold               = 1
+    operator                = "GreaterThanOrEqual"
+
+    failing_periods {
+      minimum_failing_periods_to_trigger_alert = 1
+      number_of_evaluation_periods             = 1
+    }
+  }
+
+  action {
+    action_groups = [azurerm_monitor_action_group.main.id]
+  }
+
+  description = "Fires when OpenAI returns 429 throttling errors"
+  enabled     = true
+}
