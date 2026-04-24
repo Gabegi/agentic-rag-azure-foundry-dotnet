@@ -8,11 +8,6 @@ output "openai_endpoint" {
   description = "OPENAI_ENDPOINT for InvoiceIndexer"
 }
 
-output "document_intelligence_endpoint" {
-  value       = azurerm_cognitive_account.document_intelligence.endpoint
-  description = "DOCUMENT_INTELLIGENCE_ENDPOINT for InvoiceIndexer"
-}
-
 output "storage_account_url" {
   value       = azurerm_storage_account.documents.primary_blob_endpoint
   description = "STORAGE_ACCOUNT_URL for InvoiceIndexer"

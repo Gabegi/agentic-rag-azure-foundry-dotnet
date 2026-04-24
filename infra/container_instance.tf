@@ -38,13 +38,6 @@ resource "azurerm_role_assignment" "aci_indexer_openai_user" {
   principal_id         = azurerm_user_assigned_identity.aci_indexer.principal_id
 }
 
-# Document Intelligence
-resource "azurerm_role_assignment" "aci_indexer_di_user" {
-  scope                = azurerm_cognitive_account.document_intelligence.id
-  role_definition_name = "Cognitive Services User"
-  principal_id         = azurerm_user_assigned_identity.aci_indexer.principal_id
-}
-
 resource "azurerm_container_group" "invoice_indexer" {
   name                = "aci-invoice-indexer-dev"
   resource_group_name = azurerm_resource_group.main.name
@@ -84,7 +77,6 @@ resource "azurerm_container_group" "invoice_indexer" {
       SEARCH_INDEX_NAME              = var.search_index_name
       KNOWLEDGE_SOURCE_NAME          = var.knowledge_source_name
       KNOWLEDGE_BASE_NAME            = var.knowledge_base_name
-      DOCUMENT_INTELLIGENCE_ENDPOINT = azurerm_cognitive_account.document_intelligence.endpoint
       AZURE_CLIENT_ID                = azurerm_user_assigned_identity.aci_indexer.client_id
     }
   }
@@ -107,7 +99,6 @@ resource "azurerm_container_group" "invoice_indexer" {
     azurerm_role_assignment.aci_indexer_search_index_contributor,
     azurerm_role_assignment.aci_indexer_search_service_contributor,
     azurerm_role_assignment.aci_indexer_openai_user,
-    azurerm_role_assignment.aci_indexer_di_user,
   ]
 
   # Prevent infra pipeline from recreating the container — image updates are managed by deploy-invoice-indexer
