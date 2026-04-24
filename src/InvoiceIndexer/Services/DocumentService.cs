@@ -137,6 +137,10 @@ public class DocumentService : IDocumentService
     private async Task<JsonElement?> ExtractFieldsWithGptAsync(
         string fullText, string blobName, CancellationToken ct)
     {
+        // truncate to first 1000 chars for extraction — fields are always at the top
+        // full text is kept separately in content field for semantic search
+        var extractionText = fullText.Length > 1000 ? fullText[..1000] : fullText;
+
         var prompt = "Extract fields from this invoice and return JSON only:\n" +
                      "{\n" +
                      "  \"customer\": \"full name from Bill To\",\n" +
@@ -149,10 +153,6 @@ public class DocumentService : IDocumentService
                      "}\n" +
                      "Return null for missing fields. JSON only, no explanation.\n\n" +
                      $"Invoice text:\n{extractionText}";
-
-        // truncate to first 1000 chars for extraction — fields are always at the top
-        // full text is kept separately in content field for semantic search
-        var extractionText = fullText.Length > 1000 ? fullText[..1000] : fullText;
 
         _logger.LogInformation("Sending {Chars} characters to GPT-4o for {Name}",
             extractionText.Length, blobName);
