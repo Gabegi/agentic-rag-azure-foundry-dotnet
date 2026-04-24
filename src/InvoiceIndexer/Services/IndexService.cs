@@ -40,7 +40,7 @@ public class IndexService : IIndexService
         var semanticConfig = new SemanticConfiguration("semantic-config", new SemanticPrioritizedFields
         {
             ContentFields  = { new SemanticField("content") },
-            // [6] semantic keywords — minor boost to ranking for key fields
+            // Semantic keywords — minor boost to ranking for key fields
             KeywordsFields =
             {
                 new SemanticField("customer"),
