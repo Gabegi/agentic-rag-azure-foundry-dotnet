@@ -1,4 +1,3 @@
-using Azure.AI.DocumentIntelligence;
 using Azure.AI.OpenAI;
 using Azure.Core;
 using Azure.Identity;
@@ -35,8 +34,6 @@ var host = Host.CreateDefaultBuilder(args)
             SearchIndexName              = ctx.Configuration["SEARCH_INDEX_NAME"]!,
             KnowledgeSourceName          = ctx.Configuration["KNOWLEDGE_SOURCE_NAME"]!,
             KnowledgeBaseName            = ctx.Configuration["KNOWLEDGE_BASE_NAME"]!,
-            DocumentIntelligenceEndpoint    = ctx.Configuration["DOCUMENT_INTELLIGENCE_ENDPOINT"]!,
-            DocumentIntelligenceParallelism = int.TryParse(ctx.Configuration["DI_PARALLELISM"], out var dop) ? dop : 10,
         };
 
         TokenCredential credential = new DefaultAzureCredential();
@@ -47,10 +44,6 @@ var host = Host.CreateDefaultBuilder(args)
         // Azure clients
         services.AddSingleton(_ =>
             new BlobServiceClient(new Uri(config.StorageAccountUrl), credential));
-
-        services.AddSingleton(_ =>
-            new DocumentIntelligenceClient(
-                new Uri(config.DocumentIntelligenceEndpoint), credential));
 
         services.AddSingleton(_ =>
             new AzureOpenAIClient(new Uri(config.OpenAiEndpoint), credential));
