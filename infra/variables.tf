@@ -18,6 +18,12 @@ variable "openai_gpt_deployment" {
 variable "openai_gpt_model_name" {
   description = "Model name for the Azure OpenAI GPT deployment"
   type        = string
+  default     = "gpt-4o-mini"
+}
+
+variable "openai_vision_deployment" {
+  description = "Name of the Azure OpenAI gpt-4o deployment used for invoice field extraction"
+  type        = string
   default     = "gpt-4o"
 }
 

@@ -74,7 +74,7 @@ public class KnowledgeService : IKnowledgeService
         {
             ResourceUri    = new Uri(_config.OpenAiEndpoint),
             DeploymentName = _config.OpenAiGptDeployment,
-            ModelName      = _config.OpenAiGptDeployment
+            ModelName      = "gpt-4o-mini"
         };
 
         var knowledgeBase = new KnowledgeBase(

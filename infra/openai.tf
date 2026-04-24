@@ -34,13 +34,29 @@ resource "azurerm_cognitive_deployment" "querying" {
 
   model {
     format  = "OpenAI"
-    name    = var.openai_gpt_model_name
-    version = "2024-11-20"
+    name    = "gpt-4o-mini"
+    version = "2024-07-18"
   }
 
   sku {
     name     = "Standard"
     capacity = 10
+  }
+}
+
+resource "azurerm_cognitive_deployment" "extraction" {
+  name                 = var.openai_vision_deployment
+  cognitive_account_id = azurerm_cognitive_account.openai.id
+
+  model {
+    format  = "OpenAI"
+    name    = "gpt-4o"
+    version = "2024-11-20"
+  }
+
+  sku {
+    name     = "Standard"
+    capacity = 50
   }
 }
 
