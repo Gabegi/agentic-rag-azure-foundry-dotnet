@@ -40,7 +40,13 @@ public class IndexService : IIndexService
         var semanticConfig = new SemanticConfiguration("semantic-config", new SemanticPrioritizedFields
         {
             ContentFields  = { new SemanticField("content") },
-            KeywordsFields = { new SemanticField("customer"), new SemanticField("category") }
+            // [6] semantic keywords — minor boost to ranking for key fields
+            KeywordsFields =
+            {
+                new SemanticField("customer"),
+                new SemanticField("category"),
+                new SemanticField("order_id")
+            }
         });
 
         var semanticSearch = new SemanticSearch();
@@ -64,7 +70,8 @@ public class IndexService : IIndexService
                 new SimpleField("discount", SearchFieldDataType.Double)           { IsFilterable = true, IsSortable = true },
                 new SearchableField("category")                                   { IsFilterable = true, IsFacetable = true },
                 new SimpleField("date",     SearchFieldDataType.DateTimeOffset)   { IsFilterable = true, IsSortable = true },
-                new SimpleField("order_id", SearchFieldDataType.String)           { IsFilterable = true },
+                new SimpleField("order_id",    SearchFieldDataType.String)         { IsFilterable = true },
+                new SearchableField("ship_mode")                                  { IsFilterable = true, IsFacetable = true },
                 new SimpleField("source_file", SearchFieldDataType.String)        { IsFilterable = true },
                 new SearchableField("content")                                    { AnalyzerName = "en.microsoft" },
                 new VectorSearchField("content_vector", 3072, "vector-profile")  { IsHidden = true, IsStored = false }
