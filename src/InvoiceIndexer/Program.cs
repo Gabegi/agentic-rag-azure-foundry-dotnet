@@ -29,7 +29,6 @@ var host = Host.CreateDefaultBuilder(args)
             OpenAiEmbeddingDeployment    = ctx.Configuration["OPENAI_EMBEDDING_DEPLOYMENT"]!,
             OpenAiGptDeployment          = ctx.Configuration["OPENAI_GPT_DEPLOYMENT"]!,
             OpenAiGptModelName           = ctx.Configuration["OPENAI_GPT_MODEL_NAME"]!,
-            OpenAiVisionDeployment       = ctx.Configuration["OPENAI_VISION_DEPLOYMENT"] ?? "gpt-4o",
             StorageAccountUrl            = ctx.Configuration["STORAGE_ACCOUNT_URL"]!,
             StorageContainer             = ctx.Configuration["STORAGE_CONTAINER"]!,
             SearchIndexName              = ctx.Configuration["SEARCH_INDEX_NAME"]!,

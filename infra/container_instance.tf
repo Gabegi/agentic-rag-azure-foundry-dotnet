@@ -72,7 +72,6 @@ resource "azurerm_container_group" "invoice_indexer" {
       OPENAI_EMBEDDING_DEPLOYMENT    = var.openai_embedding_deployment
       OPENAI_GPT_DEPLOYMENT          = var.openai_gpt_deployment
       OPENAI_GPT_MODEL_NAME          = var.openai_gpt_model_name
-      OPENAI_VISION_DEPLOYMENT       = var.openai_vision_deployment
       STORAGE_ACCOUNT_URL            = azurerm_storage_account.documents.primary_blob_endpoint
       STORAGE_CONTAINER              = azurerm_storage_container.documents.name
       SEARCH_INDEX_NAME              = var.search_index_name

@@ -21,12 +21,6 @@ variable "openai_gpt_model_name" {
   default     = "gpt-4o"
 }
 
-variable "openai_vision_deployment" {
-  description = "Name of the Azure OpenAI GPT-4o deployment used for invoice field extraction"
-  type        = string
-  default     = "gpt-4o"
-}
-
 variable "search_index_name" {
   description = "Name of the Azure AI Search index"
   type        = string

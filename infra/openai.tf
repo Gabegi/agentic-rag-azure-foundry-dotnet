@@ -44,21 +44,6 @@ resource "azurerm_cognitive_deployment" "querying" {
   }
 }
 
-resource "azurerm_cognitive_deployment" "gpt4o" {
-  name                 = "gpt-4o"
-  cognitive_account_id = azurerm_cognitive_account.openai.id
-
-  model {
-    format  = "OpenAI"
-    name    = "gpt-4o"
-    version = "2024-11-20"
-  }
-
-  sku {
-    name     = "Standard"
-    capacity = 30
-  }
-}
 
 resource "azurerm_role_assignment" "sp_openai_user" {
   scope                = azurerm_cognitive_account.openai.id
