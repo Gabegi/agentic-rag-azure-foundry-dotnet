@@ -22,9 +22,9 @@ variable "openai_gpt_model_name" {
 }
 
 variable "openai_vision_deployment" {
-  description = "Name of the Azure OpenAI gpt-4.1-nano deployment used for invoice field extraction"
+  description = "Name of the Azure OpenAI gpt-4o-mini deployment used for invoice field extraction"
   type        = string
-  default     = "gpt-41-nano"
+  default     = "gpt-4o-mini"
 }
 
 variable "search_index_name" {
