@@ -39,7 +39,7 @@ resource "azurerm_cognitive_deployment" "querying" {
   }
 
   sku {
-    name     = "Standard"
+    name     = "GlobalStandard"
     capacity = 10
   }
 }
@@ -55,7 +55,7 @@ resource "azurerm_cognitive_deployment" "extraction" {
   }
 
   sku {
-    name     = "Standard"
+    name     = "GlobalStandard"
     capacity = 50
   }
 }
