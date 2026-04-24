@@ -40,3 +40,4 @@ terraform.rc
 /src/InvoiceIndexer/bin
 /.vs
 /.claude
+/.vscode
