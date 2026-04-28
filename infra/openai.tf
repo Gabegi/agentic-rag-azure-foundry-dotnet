@@ -45,7 +45,7 @@ resource "azurerm_cognitive_deployment" "querying" {
 }
 
 resource "azurerm_cognitive_deployment" "extraction" {
-  name                 = var.openai_vision_deployment
+  name                 = var.openai_extraction_deployment
   cognitive_account_id = azurerm_cognitive_account.openai.id
 
   model {
