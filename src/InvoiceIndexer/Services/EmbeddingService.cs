@@ -52,6 +52,10 @@ public class EmbeddingService : IEmbeddingService
 
                 document.ContentVector = result.Value.ToFloats().ToArray();
 
+                if (document.ContentVector?.Length != 3072)
+                    _logger.LogError("Wrong vector dimensions {Dims} for {Id}",
+                        document.ContentVector?.Length, document.Id);
+
                 _logger.LogInformation("Generated vector of {Dims} dimensions for {Id}",
                     document.ContentVector?.Length, document.Id);
 

@@ -89,8 +89,17 @@ public class DocumentService : IDocumentService
                 }
             });
 
-        _logger.LogInformation("Extracted {Count} documents", documents.Count);
-        return documents;
+        var docList       = documents.ToList();
+        var nullCustomers = docList.Count(d => d.Customer == null);
+        var nullAmounts   = docList.Count(d => d.Amount == null || d.Amount <= 0);
+        var nullDates     = docList.Count(d => d.Date == null);
+
+        _logger.LogInformation("Extracted {Count} documents", docList.Count);
+        _logger.LogInformation(
+            "Quality report — null customers: {C}, null amounts: {A}, null dates: {D}",
+            nullCustomers, nullAmounts, nullDates);
+
+        return docList;
     }
 
     // Coordinates the four steps for a single blob: download → text → GPT fields → model.
@@ -100,7 +109,13 @@ public class DocumentService : IDocumentService
 
         var pdfBytes = await DownloadBlobAsync(blob, ct);
         var fullText = ExtractTextFromPdf(pdfBytes);
-        var fields   = await ExtractFieldsWithGptAsync(fullText, blob.Name, ct);
+
+        if (string.IsNullOrWhiteSpace(fullText))
+            _logger.LogWarning("Empty text extracted from {Name} — likely scanned PDF", blob.Name);
+        else if (fullText.Length < 100)
+            _logger.LogWarning("Suspiciously short text ({Chars} chars) for {Name}", fullText.Length, blob.Name);
+
+        var fields = await ExtractFieldsWithGptAsync(fullText, blob.Name, ct);
 
         if (fields == null) return null;
 
@@ -196,6 +211,13 @@ public class DocumentService : IDocumentService
         var amount   = GetDouble(fields, "amount");
         var discount = GetDouble(fields, "discount");
         var date     = GetDate(fields, "date");
+
+        if (customer == null)
+            _logger.LogWarning("Null customer for {Name}", blobName);
+        if (amount == null || amount <= 0)
+            _logger.LogWarning("Invalid amount {Amount} for {Name}", amount, blobName);
+        if (date == null)
+            _logger.LogWarning("Null date for {Name}", blobName);
 
         _logger.LogInformation(
             "Extracted fields for {Name} — customer: {Customer}, amount: {Amount}, " +
