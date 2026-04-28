@@ -141,49 +141,47 @@ public class DocumentService : IDocumentService
         // full text is kept separately in content field for semantic search
         var extractionText = fullText.Length > 1000 ? fullText[..1000] : fullText;
 
-        var prompt = "Extract fields from this invoice and return JSON only:\n" +
-                     "{\n" +
-                     "  \"customer\": \"full name from Bill To\",\n" +
-                     "  \"amount\": total as number,\n" +
-                     "  \"discount\": discount percentage as number,\n" +
-                     "  \"category\": product category,\n" +
-                     "  \"date\": \"YYYY-MM-DD\",\n" +
-                     "  \"order_id\": \"order ID string\",\n" +
-                     "  \"ship_mode\": \"shipping method\"\n" +
-                     "}\n" +
-                     "Return null for missing fields. JSON only, no explanation.\n\n" +
+        var prompt = "Extract fields from this invoice. Use null for any missing fields.\n\n" +
                      $"Invoice text:\n{extractionText}";
 
         _logger.LogInformation("Sending {Chars} characters to GPT-4o for {Name}",
             extractionText.Length, blobName);
 
+        var options = new ChatCompletionOptions
+        {
+            ResponseFormat = ChatResponseFormat.CreateJsonSchemaFormat(
+                "invoice",
+                BinaryData.FromString("""
+                {
+                    "type": "object",
+                    "properties": {
+                        "customer":  { "type": ["string", "null"] },
+                        "amount":    { "type": ["number", "null"] },
+                        "discount":  { "type": ["number", "null"] },
+                        "category":  { "type": ["string", "null"] },
+                        "date":      { "type": ["string", "null"] },
+                        "order_id":  { "type": ["string", "null"] },
+                        "ship_mode": { "type": ["string", "null"] }
+                    },
+                    "required": ["customer", "amount", "discount", "category", "date", "order_id", "ship_mode"],
+                    "additionalProperties": false
+                }
+                """),
+                strictSchemaEnabled: true)
+        };
+
         var response = await _pipeline.ExecuteAsync(async t =>
             await _chatClient.CompleteChatAsync(
                 new ChatMessage[] { new UserChatMessage(prompt) },
+                options,
                 cancellationToken: t), ct);
 
-        var json = response.Value.Content[0].Text.Trim();
+        var json = response.Value.Content[0].Text;
 
         _logger.LogInformation("GPT-4o response for {Name}: {Json}", blobName, json);
 
-        if (json.StartsWith("```"))
-        {
-            var firstNewline = json.IndexOf('\n');
-            var lastFence    = json.LastIndexOf("```");
-            json = json[(firstNewline + 1)..lastFence].Trim();
-        }
-
-        try
-        {
-            using var doc = JsonDocument.Parse(json);
-            return doc.RootElement.Clone();
-        }
-        catch (JsonException ex)
-        {
-            _logger.LogWarning("Failed to parse GPT response for {Name}: {Error}", blobName, ex.Message);
-            _logger.LogDebug("Raw GPT response: {Json}", json);
-            return null;
-        }
+        using var doc = JsonDocument.Parse(json);
+        return doc.RootElement.Clone();
     }
 
     // Maps extracted JSON fields and full text into an InvoiceDocument ready for indexing.
