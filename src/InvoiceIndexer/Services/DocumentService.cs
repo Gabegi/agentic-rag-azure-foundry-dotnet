@@ -146,6 +146,7 @@ public class DocumentService : IDocumentService
 
         _logger.LogInformation("Sending {Chars} characters to GPT-4o for {Name}",
             extractionText.Length, blobName);
+        _logger.LogDebug("Truncated extraction text for {Name}: {Text}", blobName, extractionText);
 
         var options = new ChatCompletionOptions
         {
@@ -178,7 +179,7 @@ public class DocumentService : IDocumentService
 
         var json = response.Value.Content[0].Text;
 
-        _logger.LogInformation("GPT-4o response for {Name}: {Json}", blobName, json);
+        _logger.LogDebug("GPT-4o response for {Name}: {Json}", blobName, json);
 
         using var doc = JsonDocument.Parse(json);
         return doc.RootElement.Clone();
