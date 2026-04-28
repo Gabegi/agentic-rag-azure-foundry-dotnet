@@ -31,7 +31,7 @@ public class DocumentService : IDocumentService
         ILogger<DocumentService> logger)
     {
         _containerClient = blobServiceClient.GetBlobContainerClient(config.StorageContainer);
-        _chatClient      = openAiClient.GetChatClient(config.OpenAiVisionDeployment);
+        _chatClient      = openAiClient.GetChatClient(config.OpenAiExtractionDeployment);
         _searchClient    = new SearchClient(new Uri(config.SearchEndpoint), config.SearchIndexName, credential);
         _pipeline        = pipeline;
         _logger          = logger;
