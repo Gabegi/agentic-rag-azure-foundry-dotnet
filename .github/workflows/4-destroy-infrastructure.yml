@@ -1,8 +1,6 @@
 name: 4 - Destroy Infrastructure
 
 on:
-  schedule:
-    - cron: "0 17 * * *"  # 5pm UTC daily
   workflow_dispatch:
     inputs:
       confirmation:
